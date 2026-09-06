@@ -6,7 +6,7 @@ import re
 from pathlib import Path
 from typing import List
 
-from partest.project_gen.skeleton import WriteResult, _write
+from partest_gen.skeleton import WriteResult, _write
 
 
 GENERATED_BANNER = (

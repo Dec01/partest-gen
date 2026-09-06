@@ -6,22 +6,22 @@ import json
 from pathlib import Path
 from typing import List, Optional, Sequence, Union
 
-from partest.project_gen.emitters.collections import (
+from partest_gen.emitters.collections import (
     build_collection_module,
     build_collections_init,
     build_collections_manager,
 )
-from partest.project_gen.emitters.paths import build_paths_module
-from partest.project_gen.emitters.payloads import build_payload_files, payload_wiring
-from partest.project_gen.emitters.tests_default import build_test_files
-from partest.project_gen.emitters.tests_p1 import build_p1_test_files
-from partest.project_gen.emitters.util import GENERATED_BANNER, is_snake
-from partest.project_gen.emitters.validations import (
+from partest_gen.emitters.paths import build_paths_module
+from partest_gen.emitters.payloads import build_payload_files, payload_wiring
+from partest_gen.emitters.tests_default import build_test_files
+from partest_gen.emitters.tests_p1 import build_p1_test_files
+from partest_gen.emitters.util import GENERATED_BANNER, is_snake
+from partest_gen.emitters.validations import (
     build_validation_files,
     validation_wiring,
 )
-from partest.project_gen.ir import SuiteIR
-from partest.project_gen.skeleton import WriteResult
+from partest_gen.ir import SuiteIR
+from partest_gen.skeleton import WriteResult
 
 # depth: resources=G2, default=G3, p1=G4 full P1 stubs
 DEPTH_RESOURCES = "resources"

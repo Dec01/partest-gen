@@ -7,8 +7,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Union
 
-from partest.project_gen.ir import SuiteIR
-from partest.project_gen.ui_layout import build_ui_files
+from partest_gen.ir import SuiteIR
+from partest_gen.ui_layout import build_ui_files
 
 
 @dataclass

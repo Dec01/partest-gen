@@ -5,9 +5,9 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import Dict, List, Optional, Sequence, Set, Tuple
 
-from partest.project_gen.emitters.schema_py import op_module_stem
-from partest.project_gen.emitters.util import GENERATED_BANNER, is_snake, path_to_attr
-from partest.project_gen.ir import OpIR, SuiteIR
+from partest_gen.emitters.schema_py import op_module_stem
+from partest_gen.emitters.util import GENERATED_BANNER, is_snake, path_to_attr
+from partest_gen.ir import OpIR, SuiteIR
 from partest.test_types import TYPE_LABELS, TypesTestCases as T
 
 # P1 types handled here (default + not_allowed remain in tests_default.py)

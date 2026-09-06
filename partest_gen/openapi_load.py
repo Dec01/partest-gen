@@ -8,7 +8,7 @@ from typing import Any, Dict, Union
 
 import yaml
 
-from partest.project_gen.ir import SuiteIR, build_ir_from_openapi_dict
+from partest_gen.ir import SuiteIR, build_ir_from_openapi_dict
 
 
 def load_openapi_dict(source: Union[str, Path], *, source_type: str = "auto") -> Dict[str, Any]:

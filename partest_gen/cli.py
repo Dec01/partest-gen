@@ -1,4 +1,4 @@
-"""CLI: partest-gen (G1 skeleton + G2 resources)."""
+"""CLI: ``partest-gen`` — scaffold and re-sync a partest suite from OpenAPI."""
 
 from __future__ import annotations
 
@@ -7,6 +7,8 @@ import json
 import sys
 from pathlib import Path
 from typing import List, Optional, Sequence
+
+from partest_gen import __version__
 
 
 def _parse_entities(raw: Optional[str]) -> Optional[List[str]]:
@@ -37,13 +39,13 @@ def _print_result(result, *, verbose: bool) -> None:
 
 
 def _cmd_init(args: argparse.Namespace) -> int:
-    from partest.project_gen.skeleton import init_skeleton
+    from partest_gen.skeleton import init_skeleton
 
     suite_ir = None
     openapi = _resolve_openapi(args)
 
     if openapi:
-        from partest.project_gen.openapi_load import load_openapi
+        from partest_gen.openapi_load import load_openapi
 
         suite_ir = load_openapi(openapi)
         print(
@@ -74,7 +76,7 @@ def _cmd_init(args: argparse.Namespace) -> int:
 
     # G2/G3: emit paths + collections (+ payloads/tests)
     if suite_ir is not None:
-        from partest.project_gen.emitters.resources import emit_resources
+        from partest_gen.emitters.resources import emit_resources
 
         entities = _parse_entities(getattr(args, "entities", None))
         depth = getattr(args, "depth", None) or "default"
@@ -101,7 +103,7 @@ def _cmd_init(args: argparse.Namespace) -> int:
 
 
 def _cmd_dump_ir(args: argparse.Namespace) -> int:
-    from partest.project_gen.openapi_load import load_openapi
+    from partest_gen.openapi_load import load_openapi
 
     ir = load_openapi(args.openapi)
     out = Path(args.out) if args.out else None
@@ -133,7 +135,7 @@ def _cmd_from_openapi(args: argparse.Namespace) -> int:
 
 def _cmd_init_ui(args: argparse.Namespace) -> int:
     """Add / refresh G5 UI tree on an existing project."""
-    from partest.project_gen.skeleton import apply_ui_layout
+    from partest_gen.skeleton import apply_ui_layout
 
     root = Path(args.path).resolve()
     if not root.is_dir():
@@ -170,9 +172,9 @@ def _cmd_init_package_exports(args: argparse.Namespace) -> int:
 
 def _cmd_sync_openapi(args: argparse.Namespace) -> int:
     """Refresh paths/collections/IR for an existing project (no full re-init)."""
-    from partest.project_gen.emitters.resources import emit_resources
-    from partest.project_gen.openapi_load import load_openapi
-    from partest.project_gen.skeleton import WriteResult
+    from partest_gen.emitters.resources import emit_resources
+    from partest_gen.openapi_load import load_openapi
+    from partest_gen.skeleton import WriteResult
 
     openapi = _resolve_openapi(args)
     root = Path(args.path).resolve()
@@ -232,6 +234,9 @@ def build_parser() -> argparse.ArgumentParser:
         prog="partest-gen",
         description="Scaffold partest API suites (monorepo layout).",
     )
+    # Asked for in bug reports before anything else: generated trees look alike, and the
+    # only way to tell which emitter produced one is the version that ran.
+    parser.add_argument("--version", action="version", version=f"partest-gen {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
 
     def add_common(p):

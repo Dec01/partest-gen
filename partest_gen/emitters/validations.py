@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional, Sequence, Tuple
 
-from partest.project_gen.emitters.schema_py import (
+from partest_gen.emitters.schema_py import (
     build_validation_module_source,
     op_module_stem,
     _schema_type,
 )
-from partest.project_gen.emitters.util import GENERATED_BANNER, is_snake
-from partest.project_gen.ir import OpIR, SuiteIR
+from partest_gen.emitters.util import GENERATED_BANNER, is_snake
+from partest_gen.ir import OpIR, SuiteIR
 
 
 def collect_validation_ops(
