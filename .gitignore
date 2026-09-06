@@ -1,0 +1,90 @@
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.pytest_cache/
+.cache
+.hypothesis/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints
+
+# Packaging / build artifacts
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+*.manifest
+*.spec
+
+# Virtual environments (root-only; do NOT use bare lib/bin/scripts — those
+# patterns match package paths and break a public library checkout)
+.venv/
+venv/
+ENV/
+env/
+pyvenv.cfg
+pip-selfcheck.json
+
+# Test / coverage outputs (generated)
+/reports/
+/htmlcov/
+/coverage_report.html
+.coverage
+.coverage.*
+coverage.xml
+nosetests.xml
+*,cover
+.tox/
+.nox/
+.benchmarks/
+
+# Allure (generated)
+/allure-reports/
+/allure-results/
+
+# Local secrets & runtime logs (never ship)
+.env
+.env.*
+!.env.example
+*.log
+/logs/
+local_settings.py
+
+# Editors / IDE
+.idea/
+*.iws
+.idea_modules/
+.spyderproject
+.ropeproject
+.vscode/
+*.swp
+*~
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Docs build
+docs/_build/
+
+# Optional local tooling (uncomment if you must keep private notes out of git)
+# .python-version
+
+# Source snapshots and superseded internal planning docs. They describe another
+# project's product, roles and infrastructure, so they stay out of this public
+# repository. Kept locally alongside it; see docs/wiki/WIKI.md.
+docs/raw/
+docs/archive/
+.private-names

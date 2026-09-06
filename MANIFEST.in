@@ -1,0 +1,22 @@
+# What ships to PyPI. Anything listed here is public forever.
+include partest_gen/py.typed
+recursive-include partest_gen/docs *.md
+include LICENSE
+include CHANGELOG.md
+
+# Deliberately NOT shipped:
+#   tests/      — several need repo-only files (tools/, docs/wiki/, .claude/) and cannot
+#                 pass from an sdist anyway
+#   README.md   — repo-facing; it links to docs/wiki/, AGENTS.md and .claude/skills/,
+#                 none of which ship. The PyPI description comes from docs/PYPI.md
+#   docs/       — the wiki is written for maintainers of this repository
+prune tests
+prune docs
+prune tools
+prune .claude
+prune .github
+exclude README.md
+exclude AGENTS.md
+exclude CLAUDE.md
+exclude pytest.ini
+exclude .private-names
