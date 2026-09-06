@@ -5,13 +5,13 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import Dict, List, Optional, Sequence, Set
 
-from partest.project_gen.emitters.util import (
+from partest_gen.emitters.util import (
     GENERATED_BANNER,
     class_name,
     is_snake,
     path_to_attr,
 )
-from partest.project_gen.ir import OpIR, SuiteIR
+from partest_gen.ir import OpIR, SuiteIR
 
 
 def _unique_attr(preferred: str, used: Set[str]) -> str:

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Tuple
 
-from partest.project_gen.emitters.util import is_snake, path_to_attr
+from partest_gen.emitters.util import is_snake, path_to_attr
 
 
 def op_module_stem(method: str, path: str) -> str:
