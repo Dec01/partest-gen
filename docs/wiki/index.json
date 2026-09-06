@@ -1,0 +1,840 @@
+{
+  "generated_by": "tools/docs_index.py",
+  "pages": [
+    {
+      "slug": "components/generator",
+      "path": "docs/wiki/components/generator.md",
+      "title": "partest-gen — parts of the generator",
+      "status": "current",
+      "verified": "2026-09-06",
+      "audience": "agent",
+      "ships_in_wheel": true,
+      "sources": [
+        "partest_gen/cli.py",
+        "partest_gen/ir.py",
+        "partest_gen/skeleton.py",
+        "partest_gen/openapi_load.py",
+        "partest_gen/emitters/resources.py"
+      ],
+      "headings": [
+        {
+          "level": 1,
+          "text": "partest-gen — parts of the generator"
+        },
+        {
+          "level": 2,
+          "text": "1. What it produces"
+        },
+        {
+          "level": 2,
+          "text": "2. Pipeline"
+        },
+        {
+          "level": 2,
+          "text": "3. Target tree"
+        },
+        {
+          "level": 2,
+          "text": "4. Commands"
+        },
+        {
+          "level": 1,
+          "text": "whole suite from a specification"
+        },
+        {
+          "level": 1,
+          "text": "empty skeleton, no specification yet"
+        },
+        {
+          "level": 1,
+          "text": "refresh generated artifacts after the specification changed"
+        },
+        {
+          "level": 1,
+          "text": "add the UI tree to an existing project"
+        },
+        {
+          "level": 1,
+          "text": "inspect what the generator understood, without writing a project"
+        },
+        {
+          "level": 1,
+          "text": "regenerate package __init__ re-exports under a resources tree"
+        },
+        {
+          "level": 2,
+          "text": "5. Emitters"
+        },
+        {
+          "level": 2,
+          "text": "6. Artifacts to read after a run"
+        },
+        {
+          "level": 2,
+          "text": "7. Limits worth knowing"
+        }
+      ],
+      "chars": 5498
+    },
+    {
+      "slug": "components/ui-layer",
+      "path": "docs/wiki/components/ui-layer.md",
+      "title": "The generated UI layer",
+      "status": "current",
+      "verified": "2026-09-06",
+      "audience": "user",
+      "ships_in_wheel": true,
+      "sources": [
+        "partest_gen/ui_layout.py",
+        "partest_gen/skeleton.py"
+      ],
+      "headings": [
+        {
+          "level": 1,
+          "text": "The generated UI layer"
+        },
+        {
+          "level": 2,
+          "text": "What is emitted"
+        },
+        {
+          "level": 2,
+          "text": "The isolation rule"
+        },
+        {
+          "level": 2,
+          "text": "What stays a stub forever"
+        },
+        {
+          "level": 2,
+          "text": "Baselines"
+        }
+      ],
+      "chars": 2946
+    },
+    {
+      "slug": "concepts/generated-contract",
+      "path": "docs/wiki/concepts/generated-contract.md",
+      "title": "The contract of generated code",
+      "status": "current",
+      "verified": "2026-09-06",
+      "audience": "user",
+      "ships_in_wheel": true,
+      "sources": [
+        "partest_gen/emitters/util.py",
+        "partest_gen/skeleton.py",
+        "partest_gen/emitters/tests_p1.py"
+      ],
+      "headings": [
+        {
+          "level": 1,
+          "text": "The contract of generated code"
+        },
+        {
+          "level": 2,
+          "text": "1. The banner decides ownership"
+        },
+        {
+          "level": 2,
+          "text": "2. What a stub promises, and what it does not"
+        },
+        {
+          "level": 2,
+          "text": "3. Why `type=` is always explicit"
+        },
+        {
+          "level": 2,
+          "text": "4. What is never emitted"
+        },
+        {
+          "level": 2,
+          "text": "5. Regeneration is not a merge"
+        }
+      ],
+      "chars": 3385
+    },
+    {
+      "slug": "decisions/banner-overwrite",
+      "path": "docs/wiki/decisions/banner-overwrite.md",
+      "title": "ADR — перезаписываются только файлы с баннером",
+      "status": "current",
+      "verified": "2026-09-06",
+      "audience": "maintainer",
+      "ships_in_wheel": false,
+      "sources": [
+        "partest_gen/emitters/util.py",
+        "partest_gen/skeleton.py"
+      ],
+      "headings": [
+        {
+          "level": 1,
+          "text": "ADR: политика перезаписи — по баннеру, а не по имени и не по времени"
+        },
+        {
+          "level": 2,
+          "text": "Контекст"
+        },
+        {
+          "level": 2,
+          "text": "Решение"
+        },
+        {
+          "level": 2,
+          "text": "Почему не остальные"
+        },
+        {
+          "level": 2,
+          "text": "Последствия"
+        },
+        {
+          "level": 2,
+          "text": "Что было бы мажорной версией"
+        }
+      ],
+      "chars": 2582
+    },
+    {
+      "slug": "decisions/docs-in-wheel",
+      "path": "docs/wiki/decisions/docs-in-wheel.md",
+      "title": "ADR — документация внутри колеса и генерация partest_gen/docs",
+      "status": "current",
+      "verified": "2026-09-06",
+      "audience": "maintainer",
+      "ships_in_wheel": false,
+      "sources": [
+        "tools/docs_build_wheel.py",
+        "partest_gen/docs/__init__.py",
+        "setup.py",
+        "MANIFEST.in"
+      ],
+      "headings": [
+        {
+          "level": 1,
+          "text": "ADR: документация внутри колеса, `partest_gen/docs` генерируется"
+        },
+        {
+          "level": 2,
+          "text": "Контекст"
+        },
+        {
+          "level": 2,
+          "text": "Решение"
+        },
+        {
+          "level": 2,
+          "text": "Следствия"
+        },
+        {
+          "level": 2,
+          "text": "Отклонённые альтернативы"
+        }
+      ],
+      "chars": 2249
+    },
+    {
+      "slug": "decisions/methodology-upstream",
+      "path": "docs/wiki/decisions/methodology-upstream.md",
+      "title": "ADR — методология остаётся в partest",
+      "status": "current",
+      "verified": "2026-09-06",
+      "audience": "maintainer",
+      "ships_in_wheel": false,
+      "sources": [
+        "partest_gen/ir.py"
+      ],
+      "headings": [
+        {
+          "level": 1,
+          "text": "ADR: классификатор и матрица P1 живут в `partest`, здесь их не копируют"
+        },
+        {
+          "level": 2,
+          "text": "Контекст"
+        },
+        {
+          "level": 2,
+          "text": "Решение"
+        },
+        {
+          "level": 2,
+          "text": "Почему"
+        },
+        {
+          "level": 2,
+          "text": "Последствия"
+        },
+        {
+          "level": 2,
+          "text": "Что этим не запрещено"
+        }
+      ],
+      "chars": 2247
+    },
+    {
+      "slug": "decisions/no-domain",
+      "path": "docs/wiki/decisions/no-domain.md",
+      "title": "ADR — в генерируемом коде нет продуктового домена",
+      "status": "current",
+      "verified": "2026-09-06",
+      "audience": "maintainer",
+      "ships_in_wheel": false,
+      "sources": [
+        "partest_gen/skeleton.py",
+        "partest_gen/ui_layout.py",
+        "partest_gen/emitters/payloads.py"
+      ],
+      "headings": [
+        {
+          "level": 1,
+          "text": "ADR: генератор пишет структуру, домен остаётся у проекта"
+        },
+        {
+          "level": 2,
+          "text": "Решение"
+        },
+        {
+          "level": 2,
+          "text": "Почему"
+        },
+        {
+          "level": 2,
+          "text": "Заглушка честнее правдоподобного кода"
+        },
+        {
+          "level": 2,
+          "text": "Маркер тестовых данных — не домен"
+        },
+        {
+          "level": 2,
+          "text": "Как проверять"
+        }
+      ],
+      "chars": 2661
+    },
+    {
+      "slug": "decisions/separate-package",
+      "path": "docs/wiki/decisions/separate-package.md",
+      "title": "ADR — генератор выделен в отдельный дистрибутив",
+      "status": "current",
+      "verified": "2026-09-06",
+      "audience": "maintainer",
+      "ships_in_wheel": false,
+      "sources": [],
+      "headings": [
+        {
+          "level": 1,
+          "text": "ADR: генератор — отдельный пакет, а не подпакет `partest`"
+        },
+        {
+          "level": 2,
+          "text": "Контекст"
+        },
+        {
+          "level": 2,
+          "text": "Решение"
+        },
+        {
+          "level": 2,
+          "text": "Что сделано для тех, кто уже поставил `partest`"
+        },
+        {
+          "level": 2,
+          "text": "Последствия"
+        },
+        {
+          "level": 2,
+          "text": "Альтернативы"
+        }
+      ],
+      "chars": 3681
+    },
+    {
+      "slug": "howto/after-generation",
+      "path": "docs/wiki/howto/after-generation.md",
+      "title": "Turning stubs into tests",
+      "status": "current",
+      "verified": "2026-09-06",
+      "audience": "user",
+      "ships_in_wheel": true,
+      "sources": [
+        "partest_gen/emitters/tests_p1.py",
+        "partest_gen/emitters/tests_default.py",
+        "partest_gen/emitters/payloads.py"
+      ],
+      "headings": [
+        {
+          "level": 1,
+          "text": "Turning stubs into tests"
+        },
+        {
+          "level": 2,
+          "text": "0. Order the work by impact"
+        },
+        {
+          "level": 2,
+          "text": "1. One endpoint at a time"
+        },
+        {
+          "level": 2,
+          "text": "2. Use the generated facades"
+        },
+        {
+          "level": 2,
+          "text": "3. Malformed bodies go through the client"
+        },
+        {
+          "level": 2,
+          "text": "4. Clean up what you create"
+        },
+        {
+          "level": 2,
+          "text": "5. Measure, then choose the next slice"
+        },
+        {
+          "level": 2,
+          "text": "6. If a UI tree was generated"
+        },
+        {
+          "level": 2,
+          "text": "7. Done, for a slice"
+        }
+      ],
+      "chars": 4014
+    },
+    {
+      "slug": "howto/contribute",
+      "path": "docs/wiki/howto/contribute.md",
+      "title": "Разработка генератора",
+      "status": "current",
+      "verified": "2026-09-06",
+      "audience": "maintainer",
+      "ships_in_wheel": false,
+      "sources": [
+        "partest_gen/skeleton.py",
+        "partest_gen/emitters/util.py",
+        "tests/test_golden_suite.py",
+        "tools/check_all.py"
+      ],
+      "headings": [
+        {
+          "level": 1,
+          "text": "Разработка генератора"
+        },
+        {
+          "level": 2,
+          "text": "Установка для разработки"
+        },
+        {
+          "level": 2,
+          "text": "Одна команда перед коммитом"
+        },
+        {
+          "level": 2,
+          "text": "Инварианты, которые нельзя нарушить молча"
+        },
+        {
+          "level": 2,
+          "text": "Где что лежит"
+        },
+        {
+          "level": 2,
+          "text": "Как менять то, что генерируется"
+        },
+        {
+          "level": 2,
+          "text": "Тесты"
+        },
+        {
+          "level": 2,
+          "text": "Документация"
+        }
+      ],
+      "chars": 4188
+    },
+    {
+      "slug": "howto/release",
+      "path": "docs/wiki/howto/release.md",
+      "title": "Release checklist",
+      "status": "current",
+      "verified": "2026-09-06",
+      "audience": "maintainer",
+      "ships_in_wheel": false,
+      "sources": [
+        "setup.py",
+        "MANIFEST.in",
+        "partest_gen/__init__.py",
+        "tools/docs_build_wheel.py"
+      ],
+      "headings": [
+        {
+          "level": 1,
+          "text": "Release checklist"
+        },
+        {
+          "level": 2,
+          "text": "1. Decide the number"
+        },
+        {
+          "level": 2,
+          "text": "2. Prepare"
+        },
+        {
+          "level": 2,
+          "text": "3. Look at what it generates, not only at what it exports"
+        },
+        {
+          "level": 2,
+          "text": "4. Build and inspect the artifact"
+        },
+        {
+          "level": 2,
+          "text": "5. Publish"
+        },
+        {
+          "level": 3,
+          "text": "If you have to publish by hand"
+        },
+        {
+          "level": 2,
+          "text": "6. Record"
+        },
+        {
+          "level": 2,
+          "text": "7. Rollback"
+        }
+      ],
+      "chars": 5293
+    },
+    {
+      "slug": "howto/resync",
+      "path": "docs/wiki/howto/resync.md",
+      "title": "Re-syncing after the specification changed",
+      "status": "current",
+      "verified": "2026-09-06",
+      "audience": "user",
+      "ships_in_wheel": true,
+      "sources": [
+        "partest_gen/cli.py",
+        "partest_gen/emitters/resources.py",
+        "partest_gen/emitters/util.py"
+      ],
+      "headings": [
+        {
+          "level": 1,
+          "text": "Re-syncing after the specification changed"
+        },
+        {
+          "level": 2,
+          "text": "What happens"
+        },
+        {
+          "level": 2,
+          "text": "The safe sequence"
+        },
+        {
+          "level": 2,
+          "text": "New operations"
+        },
+        {
+          "level": 2,
+          "text": "Operations that changed shape"
+        },
+        {
+          "level": 2,
+          "text": "When `--force` is the answer"
+        }
+      ],
+      "chars": 2942
+    },
+    {
+      "slug": "howto/scaffold",
+      "path": "docs/wiki/howto/scaffold.md",
+      "title": "From an OpenAPI file to a collectable suite",
+      "status": "current",
+      "verified": "2026-09-06",
+      "audience": "user",
+      "ships_in_wheel": true,
+      "sources": [
+        "partest_gen/cli.py",
+        "partest_gen/skeleton.py",
+        "partest_gen/emitters/resources.py"
+      ],
+      "headings": [
+        {
+          "level": 1,
+          "text": "From an OpenAPI file to a collectable suite"
+        },
+        {
+          "level": 2,
+          "text": "1. Install"
+        },
+        {
+          "level": 2,
+          "text": "2. Look before you write"
+        },
+        {
+          "level": 2,
+          "text": "3. Generate"
+        },
+        {
+          "level": 2,
+          "text": "4. Check it holds together"
+        },
+        {
+          "level": 2,
+          "text": "5. Read the three maps"
+        },
+        {
+          "level": 2,
+          "text": "6. Wire the environment"
+        },
+        {
+          "level": 2,
+          "text": "7. Then what"
+        }
+      ],
+      "chars": 3241
+    },
+    {
+      "slug": "index",
+      "path": "docs/wiki/index.md",
+      "title": "Каталог документации partest-gen",
+      "status": "current",
+      "verified": "2026-09-06",
+      "audience": "agent",
+      "ships_in_wheel": false,
+      "sources": [],
+      "headings": [
+        {
+          "level": 1,
+          "text": "Каталог"
+        },
+        {
+          "level": 2,
+          "text": "Первым делом"
+        },
+        {
+          "level": 2,
+          "text": "concepts — почему так"
+        },
+        {
+          "level": 2,
+          "text": "components — что есть"
+        },
+        {
+          "level": 2,
+          "text": "howto — как сделать"
+        },
+        {
+          "level": 2,
+          "text": "decisions — почему именно так"
+        },
+        {
+          "level": 2,
+          "text": "Вне wiki"
+        },
+        {
+          "level": 2,
+          "text": "Соседний репозиторий"
+        }
+      ],
+      "chars": 2478
+    },
+    {
+      "slug": "log",
+      "path": "docs/wiki/log.md",
+      "title": "Журнал операций над документацией",
+      "status": "current",
+      "verified": "2026-09-06",
+      "audience": "maintainer",
+      "ships_in_wheel": false,
+      "sources": [],
+      "headings": [
+        {
+          "level": 1,
+          "text": "Журнал"
+        },
+        {
+          "level": 2,
+          "text": "2026-09-06 · создание репозитория · выделение генератора из `partest`"
+        }
+      ],
+      "chars": 3021
+    },
+    {
+      "slug": "status",
+      "path": "docs/wiki/status.md",
+      "title": "Статус, версии и что дальше",
+      "status": "current",
+      "verified": "2026-09-06",
+      "audience": "maintainer",
+      "ships_in_wheel": false,
+      "sources": [
+        "partest_gen/__init__.py",
+        "CHANGELOG.md"
+      ],
+      "headings": [
+        {
+          "level": 1,
+          "text": "Статус partest-gen"
+        },
+        {
+          "level": 2,
+          "text": "1. Что готово (не переизобретать)"
+        },
+        {
+          "level": 2,
+          "text": "2. Что дальше"
+        },
+        {
+          "level": 3,
+          "text": "Позже"
+        },
+        {
+          "level": 3,
+          "text": "HOLD"
+        },
+        {
+          "level": 2,
+          "text": "3. Совместимость с `partest`"
+        },
+        {
+          "level": 2,
+          "text": "4. Как обновлять эту страницу"
+        }
+      ],
+      "chars": 3502
+    },
+    {
+      "slug": "WIKI",
+      "path": "docs/wiki/WIKI.md",
+      "title": "Схема документации",
+      "status": "current",
+      "verified": "2026-09-06",
+      "audience": "maintainer",
+      "ships_in_wheel": false,
+      "sources": [],
+      "headings": [
+        {
+          "level": 1,
+          "text": "WIKI.md — схема документации partest-gen"
+        },
+        {
+          "level": 2,
+          "text": "Три слоя"
+        },
+        {
+          "level": 2,
+          "text": "Структура wiki"
+        },
+        {
+          "level": 2,
+          "text": "Frontmatter — обязателен на каждой странице"
+        },
+        {
+          "level": 2,
+          "text": "Язык"
+        },
+        {
+          "level": 2,
+          "text": "Ссылки"
+        },
+        {
+          "level": 2,
+          "text": "Версии"
+        },
+        {
+          "level": 2,
+          "text": "Рабочие циклы"
+        },
+        {
+          "level": 2,
+          "text": "RAG — когда включать"
+        },
+        {
+          "level": 2,
+          "text": "Инварианты правки"
+        }
+      ],
+      "chars": 5346
+    }
+  ],
+  "raw": [],
+  "pages_by_source": {
+    "CHANGELOG.md": [
+      "status"
+    ],
+    "MANIFEST.in": [
+      "decisions/docs-in-wheel",
+      "howto/release"
+    ],
+    "partest_gen/__init__.py": [
+      "howto/release",
+      "status"
+    ],
+    "partest_gen/cli.py": [
+      "components/generator",
+      "howto/resync",
+      "howto/scaffold"
+    ],
+    "partest_gen/docs/__init__.py": [
+      "decisions/docs-in-wheel"
+    ],
+    "partest_gen/emitters/payloads.py": [
+      "decisions/no-domain",
+      "howto/after-generation"
+    ],
+    "partest_gen/emitters/resources.py": [
+      "components/generator",
+      "howto/resync",
+      "howto/scaffold"
+    ],
+    "partest_gen/emitters/tests_default.py": [
+      "howto/after-generation"
+    ],
+    "partest_gen/emitters/tests_p1.py": [
+      "concepts/generated-contract",
+      "howto/after-generation"
+    ],
+    "partest_gen/emitters/util.py": [
+      "concepts/generated-contract",
+      "decisions/banner-overwrite",
+      "howto/contribute",
+      "howto/resync"
+    ],
+    "partest_gen/ir.py": [
+      "components/generator",
+      "decisions/methodology-upstream"
+    ],
+    "partest_gen/openapi_load.py": [
+      "components/generator"
+    ],
+    "partest_gen/skeleton.py": [
+      "components/generator",
+      "components/ui-layer",
+      "concepts/generated-contract",
+      "decisions/banner-overwrite",
+      "decisions/no-domain",
+      "howto/contribute",
+      "howto/scaffold"
+    ],
+    "partest_gen/ui_layout.py": [
+      "components/ui-layer",
+      "decisions/no-domain"
+    ],
+    "setup.py": [
+      "decisions/docs-in-wheel",
+      "howto/release"
+    ],
+    "tests/test_golden_suite.py": [
+      "howto/contribute"
+    ],
+    "tools/check_all.py": [
+      "howto/contribute"
+    ],
+    "tools/docs_build_wheel.py": [
+      "decisions/docs-in-wheel",
+      "howto/release"
+    ]
+  }
+}
