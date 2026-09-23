@@ -6,6 +6,23 @@ code generator: the **names and locations of the files it writes** are part of t
 Renaming a generated module breaks hand-written imports in every project that ran the previous
 version, so it is a major change even though no exported name moved.
 
+## 1.0.1 — 2026-09-23
+
+### Fixed
+
+- **The source distribution could not be built.** `MANIFEST.in` pruned `docs/`, and
+  `setup.py` reads `docs/PYPI.md` unconditionally for its long description, so the file
+  the build needs was the one the manifest removed. Installing from source —
+  `pip install --no-binary :all:`, a mirror that carries no wheels, a closed network that
+  builds everything itself — failed on the first line of the build:
+
+  ```
+  FileNotFoundError: [Errno 2] No such file or directory: '.../docs/PYPI.md'
+  ```
+
+  The wheel was fine, which is why ordinary installation never noticed and why the defect
+  shipped. Nothing else changed in this release.
+
 ## [1.0.0] — unreleased
 
 First release as a standalone distribution. The generator itself is not new: it shipped inside
