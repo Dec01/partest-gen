@@ -1,7 +1,7 @@
 ---
 title: ADR — в генерируемом коде нет продуктового домена
 status: current
-verified: 2026-09-06
+verified: 2026-09-13
 sources: [partest_gen/skeleton.py, partest_gen/ui_layout.py, partest_gen/emitters/payloads.py]
 audience: maintainer
 ships_in_wheel: false

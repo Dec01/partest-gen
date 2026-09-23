@@ -73,6 +73,34 @@ def test_init_skeleton_tree(tmp_path: Path):
     assert not any(x == "README.md" for x in result2.created) or True
 
 
+def test_skeleton_documents_tls_instead_of_disabling_it(tmp_path: Path):
+    """partest verifies certificates; the scaffold explains the switch, never flips it."""
+    result = init_skeleton(tmp_path / "tls", name="shop", force=True, with_ui=True)
+    root = Path(result.root)
+
+    conf = (root / "confpartest.py").read_text(encoding="utf-8")
+    assert "tls_verify" in conf, "confpartest.py must carry the TLS hint"
+    assert "PARTEST_TLS_VERIFY" in conf
+    # the hint is a hint: every tls_verify line stays commented out
+    for line in conf.splitlines():
+        if "tls_verify" in line:
+            assert line.lstrip().startswith("#"), f"uncommented TLS switch: {line!r}"
+
+    for path in root.rglob("*.py"):
+        text = path.read_text(encoding="utf-8")
+        assert "verify=False" not in text, f"{path} disables certificate verification"
+
+
+def test_skeleton_requirements_floor_matches_methodology_layout(tmp_path: Path):
+    """Emitted code reads partest.methodology.api, which only exists from 2.0.0."""
+    result = init_skeleton(tmp_path / "reqs", name="shop", force=True)
+    root = Path(result.root)
+    api = (root / "requirements/api.txt").read_text(encoding="utf-8")
+    ui = (root / "requirements/ui.txt").read_text(encoding="utf-8")
+    assert "partest>=2.0.0" in api
+    assert "partest[ui]>=2.0.0" in ui
+
+
 def test_init_with_ir_writes_partest_dir(tmp_path: Path):
     ir = load_openapi(FIXTURE)
     result = init_skeleton(

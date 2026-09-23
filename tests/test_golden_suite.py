@@ -82,6 +82,16 @@ def test_golden_tree_shape(golden_suite: Path):
     missing = [p for p in must if not (root / p).is_file()]
     assert not missing, f"missing golden artifacts: {missing}"
 
+    # Nothing in a full generated suite may switch certificate verification off, and the
+    # project-local config is where the switch is documented instead.
+    offenders = [
+        str(p.relative_to(root))
+        for p in root.rglob("*.py")
+        if "verify=False" in p.read_text(encoding="utf-8")
+    ]
+    assert not offenders, f"generated code disables TLS verification: {offenders}"
+    assert "tls_verify" in (root / "confpartest.py").read_text(encoding="utf-8")
+
     summary = (root / ".partest/openapi_summary.md").read_text(encoding="utf-8")
     assert "items" in summary.lower()
     paths = (root / "src/api/resources/endpoints/paths.py").read_text(encoding="utf-8")

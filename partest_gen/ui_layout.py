@@ -222,6 +222,8 @@ from typing import Any, Dict, Optional
 
 import pytest
 
+from partest.tls import resolve_verify, verify_for_httpx
+
 try:
     import httpx
 except ImportError:  # pragma: no cover
@@ -237,7 +239,12 @@ def api_base_url() -> str:
 def api_seed_client(api_base_url):
     if httpx is None:
         pytest.skip("httpx required for api_seed")
-    with httpx.Client(base_url=api_base_url, verify=False, timeout=30.0) as client:
+    # Certificates are verified, like every partest client. ``env_only`` is the UI road:
+    # PARTEST_TLS_VERIFY=0 (or a CA bundle path) covers a self-signed stand, while
+    # ``tls_verify`` in confpartest.py deliberately does not reach here — a UI job must
+    # not load the API config.
+    verify = verify_for_httpx(resolve_verify(None, env_only=True))
+    with httpx.Client(base_url=api_base_url, verify=verify, timeout=30.0) as client:
         yield client
 
 

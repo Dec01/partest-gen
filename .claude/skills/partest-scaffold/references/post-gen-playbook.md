@@ -45,7 +45,16 @@ Prioritize **impact**: auth / money / PII writes before catalog GETs.
 3. Uncomment `TokenManager` fixtures in `src/api/tests/conftest.py` when roles exist.
 4. Confirm: `pytest src/api/tests/test_smoke_health.py -q` (or health default) hits the stand.
 
+TLS on the first run: `partest` verifies certificates, and the generated clients inherit that.
+A self-signed or internally signed stand fails with `SSLError` / `ConnectError` **during
+collection**, before any test runs. The answer is already in the project — the commented
+`tls_verify` block in `confpartest.py`; prefer the CA bundle form, which keeps the check.
+`PARTEST_TLS_VERIFY` does the same from the environment and wins over the file. Do **not** put
+`verify=False` back into a fixture: that decision then hides in a file nobody reads twice.
+
 Isolation rule: **UI tests must not import** API swagger session / `confpartest` coverage loaders.
+The UI seed client reads TLS from the environment only (`resolve_verify(..., env_only=True)`), so
+`tls_verify` in `confpartest.py` intentionally does not reach a UI run.
 
 ---
 

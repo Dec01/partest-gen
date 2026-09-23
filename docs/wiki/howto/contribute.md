@@ -1,7 +1,7 @@
 ---
 title: Разработка генератора
 status: current
-verified: 2026-09-06
+verified: 2026-09-13
 sources: [partest_gen/skeleton.py, partest_gen/emitters/util.py, tests/test_golden_suite.py, tools/check_all.py]
 audience: maintainer
 ships_in_wheel: false

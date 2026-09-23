@@ -42,9 +42,11 @@ setup(
     },
     install_requires=[
         # The generator emits code against this harness and reads its methodology to decide
-        # which test cases each operation needs, so the two move together. 1.8.0 is the
-        # first release whose classifier and subtype overrides match what is emitted here.
-        "partest>=1.8.0",
+        # which test cases each operation needs, so the two move together. 2.0.0 is the
+        # release that split the methodology into `partest.methodology.api` and `.ui`; the
+        # deep paths this package imports do not exist at all before it, and an older
+        # install fails as an ImportError while the suite is being collected.
+        "partest>=2.0.0",
         "pyyaml>=6.0.2",
         # Imported lazily, only for `--url`. Declared anyway: relying on it arriving through
         # partest's own dependencies would make a URL fetch break on an unrelated change.

@@ -45,6 +45,12 @@ Seeding data for a UI test is the one place the temptation appears. Do it throug
 `fixtures/api_seed.py`, which talks to the API with a plain client — no coverage session, no
 specification load.
 
+Its one concession to the harness is TLS: the seed client asks
+`partest.tls.resolve_verify(None, env_only=True)` what `verify=` should be, because hardcoding
+`verify=False` in a generated file is how a project ends up unverified without ever deciding to
+be. `env_only` keeps the isolation rule: `PARTEST_TLS_VERIFY` is read, `confpartest` is not, so
+`tls_verify = False` in the project file deliberately does **not** reach a UI job.
+
 ## What stays a stub forever
 
 These are emitted once, with a `TODO`, and are never overwritten by a re-sync, because their

@@ -168,7 +168,7 @@ Faker>=13.12.0
 """
 
     files["requirements/api.txt"] = """-r base.txt
-partest>=1.7.0
+partest>=2.0.0
 pytest>=8.0.0
 pytest-asyncio>=0.23.7
 allure-pytest>=2.8.18
@@ -177,7 +177,7 @@ requests>=2.31.0
 """
 
     files["requirements/ui.txt"] = """-r base.txt
-partest[ui]>=1.5.0
+partest[ui]>=2.0.0
 pytest>=8.0.0
 pytest-playwright>=0.5.0
 allure-pytest>=2.8.18
@@ -205,6 +205,18 @@ KEYCLOAK_CLIENT_ID=
 swagger_files = {{
     "{safe_name}": ["local", "{openapi_conf}"],
 }}
+
+# TLS. partest verifies certificates by default, and the clients in
+# src/api/tests/conftest.py inherit that. A stand with a self-signed or internally signed
+# certificate fails with SSLError / ConnectError — during collection, because the
+# specification is loaded while the suite is assembled. One of these lines covers the whole
+# suite; uncomment the one that is true for your stand:
+#
+#     tls_verify = "/etc/ssl/corp-ca.pem"   # preferred: keep checking, trust your own CA
+#     tls_verify = False                    # last resort: warns once per process
+#
+# The environment wins over this file: PARTEST_TLS_VERIFY=0 or a bundle path. The same
+# switch also covers fetching the specification, and that host is often a different one.
 
 # Used only when zorro(use_matrix=False)
 test_types_coverage = [
