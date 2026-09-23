@@ -6,6 +6,67 @@ code generator: the **names and locations of the files it writes** are part of t
 Renaming a generated module breaks hand-written imports in every project that ran the previous
 version, so it is a major change even though no exported name moved.
 
+## Unreleased
+
+### Added
+
+- **Python 3.14 is supported**, and the classifier says so because the suite was run on it,
+  not because the version looked plausible: 54 passed on 3.14.4 in a clean interpreter, the
+  same count as on 3.10. Nothing the generator depends on lacks a 3.14 wheel.
+
+  The floor stays at 3.10. This adds a version rather than dropping any.
+
+### Security
+
+- **Dependency floors rose to the first release without a known advisory.** A floor is what
+  a consumer is allowed to install, and sooner or later something installs exactly it — a
+  lockfile resolved for reproducibility, an offline mirror, a `--no-binary` build on an old
+  index. Auditing the *declared* floors rather than the resolved environment found eight
+  advisories in two packages:
+
+  | Package | Was | Now | Why this number |
+  |---|---|---|---|
+  | `requests` | `>=2.31.0` | `>=2.33.0` | PYSEC-2026-1873 is fixed in 2.32.0, PYSEC-2026-1872 in 2.32.4, PYSEC-2026-2275 in 2.33.0 — the earliest release free of all three, not the newest release |
+  | `pytest` (extra `dev`) | `>=8.0.0` | `>=9.0.3` | PYSEC-2026-1845 has no fix in the 8.x line at all |
+
+  `partest>=2.0.0` and `pyyaml>=6.0.2` audit clean at their floors and did not move.
+
+- **The `dev` extra no longer installs pytest 8.** Contributors to this repository need
+  pytest 9.0.3 or newer; there is no fix for PYSEC-2026-1845 inside 8.x, so supporting it
+  would mean asking people to develop on a version with a known advisory. This affects
+  only `pip install -e ".[dev]"` — `partest-gen` itself neither imports pytest nor
+  registers a plugin, and nothing constrains the pytest version in *your* suite. No upper
+  bound is declared for the same reason.
+
+- **Generated projects are no longer seeded with vulnerable minimums.** `partest-gen init`
+  writes `requirements/{base,api}.txt`, and those floors were the ones a new suite starts
+  from. Auditing them the same way found four:
+
+  | Seeded in | Was | Now | Advisory |
+  |---|---|---|---|
+  | `requirements/api.txt`, `ui.txt` | `pytest>=8.0.0` | `pytest>=9.0.3` | PYSEC-2026-1845 |
+  | `requirements/api.txt` | `requests>=2.31.0` | `requests>=2.33.0` | PYSEC-2026-1873, -1872, -2275 |
+  | `requirements/base.txt` | `pydantic>=2.0.0` | `pydantic>=2.4.0` | PYSEC-2026-1812 |
+  | `requirements/base.txt` | `python-dotenv>=1.0.0` | `python-dotenv>=1.2.2` | PYSEC-2026-2270 |
+
+  Three plugin floors travelled with pytest's, because a set of floors has to be
+  installable *and runnable* at its minimum, not only resolvable from the newest index:
+
+  | Seeded | Was | Now | What the old floor did next to pytest 9 |
+  |---|---|---|---|
+  | `pytest-asyncio` | `>=0.23.7` | `>=1.3.0` | declares `pytest<9` up to 1.2.0 — the minimum does not install |
+  | `pytest-playwright` | `>=0.5.0` | `>=0.7.2` | declares `pytest<9.0.0` up to 0.7.1 — the minimum does not install |
+  | `allure-pytest` | `>=2.8.18` | `>=2.13.3` | installs, then errors **every** test in `pytest_runtest_setup` with `AttributeError: 'str' object has no attribute 'iter_parents'` |
+
+  **In an existing generated tree these files are yours**, not the generator's: they carry
+  no `AUTO-GENERATED` banner, so `sync-openapi` will not update them. Raise the floors by
+  hand — nothing else in the suite has to change, and a suite already running on newer
+  plugins is unaffected, because these are minimums, not pins.
+
+  The pinned flat scaffold (`RootFilesContainer`) was corrected under 1.0.0 — "The
+  `requirements.txt` of the flat scaffold matches what `partest` declares today". The G1
+  skeleton, which is what `init` actually writes, was missed then; this finishes that job.
+
 ## 1.0.1 — 2026-09-23
 
 ### Fixed

@@ -160,27 +160,39 @@ addopts =
 
     files["requirements.txt"] = "-r requirements/api.txt\n"
 
+    # Floors are audited, not guessed: a scaffold that seeds `>=` on a version with a known
+    # advisory hands every new suite a vulnerable minimum, and nobody installs the minimum
+    # until the day a lockfile or an offline mirror does. Each floor below is the earliest
+    # release free of the advisories against the previous one.
+    #
+    # The set is also checked for being installable *at the minimum* and for running there,
+    # not only for resolving: `pytest-asyncio` declared `pytest<9` up to 1.2.0 and
+    # `pytest-playwright` up to 0.7.1, so both floors had to cross with pytest's, while
+    # `allure-pytest` 2.8.18 installs happily next to pytest 9 and then dies in
+    # `pytest_runtest_setup` ("'str' object has no attribute 'iter_parents'") — every test
+    # errors. 2.13.3 is the first release that survives; a floor nobody can run is as
+    # useless as one nobody should install.
     files["requirements/base.txt"] = """httpx>=0.27.2
-pydantic>=2.0.0
-python-dotenv>=1.0.0
+pydantic>=2.4.0
+python-dotenv>=1.2.2
 PyYAML>=6.0.2
 Faker>=13.12.0
 """
 
     files["requirements/api.txt"] = """-r base.txt
 partest>=2.0.0
-pytest>=8.0.0
-pytest-asyncio>=0.23.7
-allure-pytest>=2.8.18
+pytest>=9.0.3
+pytest-asyncio>=1.3.0
+allure-pytest>=2.13.3
 matplotlib>=3.9.2
-requests>=2.31.0
+requests>=2.33.0
 """
 
     files["requirements/ui.txt"] = """-r base.txt
 partest[ui]>=2.0.0
-pytest>=8.0.0
-pytest-playwright>=0.5.0
-allure-pytest>=2.8.18
+pytest>=9.0.3
+pytest-playwright>=0.7.2
+allure-pytest>=2.13.3
 """
 
     files["requirements/local.txt"] = """-r api.txt

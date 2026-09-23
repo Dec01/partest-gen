@@ -101,6 +101,34 @@ def test_skeleton_requirements_floor_matches_methodology_layout(tmp_path: Path):
     assert "partest[ui]>=2.0.0" in ui
 
 
+def test_skeleton_requirements_seed_audited_floors(tmp_path: Path):
+    """A scaffold hands every new suite its minimum, and nobody installs the minimum until
+    a lockfile or an offline mirror does. Floors with a known advisory must not be seeded.
+
+    Each pin below is the earliest release free of the advisories against the floor it
+    replaced; raise one here only after the audit says the old one is no longer clean.
+    """
+    result = init_skeleton(tmp_path / "floors", name="shop", force=True)
+    root = Path(result.root)
+    seeded = "".join(
+        (root / "requirements" / name).read_text(encoding="utf-8")
+        for name in ("base.txt", "api.txt", "ui.txt")
+    )
+
+    for floor in ("pytest>=9.0.3", "requests>=2.33.0", "pydantic>=2.4.0",
+                  "python-dotenv>=1.2.2"):
+        assert floor in seeded, f"generated project no longer seeds the audited {floor}"
+    for withdrawn in ("pytest>=8.0.0", "requests>=2.31.0", "pydantic>=2.0.0",
+                      "python-dotenv>=1.0.0"):
+        assert withdrawn not in seeded, f"generated project seeds vulnerable {withdrawn}"
+
+    # Plugin floors travel with pytest's or the minimum stops being installable — and, for
+    # allure, stops running: 2.8.18 resolves next to pytest 9 and then errors every test.
+    for floor in ("pytest-asyncio>=1.3.0", "pytest-playwright>=0.7.2",
+                  "allure-pytest>=2.13.3"):
+        assert floor in seeded, f"generated project seeds a plugin floor pytest 9 rejects: {floor}"
+
+
 def test_init_with_ir_writes_partest_dir(tmp_path: Path):
     ir = load_openapi(FIXTURE)
     result = init_skeleton(

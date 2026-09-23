@@ -1,7 +1,7 @@
 ---
 title: partest-gen — parts of the generator
 status: current
-verified: 2026-09-13
+verified: 2026-09-23
 sources: [partest_gen/cli.py, partest_gen/ir.py, partest_gen/skeleton.py, partest_gen/openapi_load.py, partest_gen/emitters/resources.py]
 audience: agent
 ships_in_wheel: true
