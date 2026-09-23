@@ -17,7 +17,7 @@ from partest_gen.openapi_load import load_openapi
 from partest_gen.ui_layout import build_ui_files
 
 # The one place the version lives. setup.py reads it; nothing else may repeat it.
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 
 __all__ = [
     "OpIR",
