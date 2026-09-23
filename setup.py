@@ -46,15 +46,26 @@ setup(
         # release that split the methodology into `partest.methodology.api` and `.ui`; the
         # deep paths this package imports do not exist at all before it, and an older
         # install fails as an ImportError while the suite is being collected.
-        "partest>=2.0.0",
+        # Не «код требует нового», а защита потребителя: партии 2.0.x объявляют
+        # уязвимые полы requests и python-dotenv, и на минимальном разрешении они
+        # приезжают сюда транзитивно. 2.1.0 — первая, где они подняты.
+        "partest>=2.1.0",
         "pyyaml>=6.0.2",
         # Imported lazily, only for `--url`. Declared anyway: relying on it arriving through
         # partest's own dependencies would make a URL fetch break on an unrelated change.
-        "requests>=2.31.0",
+        # The floor is where the advisories against 2.31.0 end, not the newest release:
+        # PYSEC-2026-1873 is fixed in 2.32.0, PYSEC-2026-1872 in 2.32.4, PYSEC-2026-2275
+        # in 2.33.0 — so 2.33.0 is the earliest version free of all three.
+        "requests>=2.33.0",
     ],
     extras_require={
         "dev": [
-            "pytest>=8.0.0",
+            # PYSEC-2026-1845 has no fix inside the 8.x line, so the floor crosses a major:
+            # 9.0.3 is the first release that carries it. No ceiling on purpose — this
+            # package registers no pytest plugin (`entry_points` declares a console script
+            # only) and imports pytest nowhere, so a new pytest major can break this
+            # repository's own test run, never a consumer's collection.
+            "pytest>=9.0.3",
         ],
     },
     entry_points={
@@ -67,6 +78,7 @@ setup(
         "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",
         "Programming Language :: Python :: 3.13",
+        "Programming Language :: Python :: 3.14",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
         "Framework :: Pytest",

@@ -1,7 +1,7 @@
 ---
 title: The contract of generated code
 status: current
-verified: 2026-09-13
+verified: 2026-09-23
 sources: [partest_gen/emitters/util.py, partest_gen/skeleton.py, partest_gen/emitters/tests_p1.py]
 audience: user
 ships_in_wheel: true
