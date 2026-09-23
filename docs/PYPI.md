@@ -88,7 +88,7 @@ changes, the contract of generated code, the parts of the generator, and the UI 
 
 ## Requirements
 
-Python 3.10+, `partest>=1.8.0`, `pyyaml`, `requests` (only for `--url`). The generated UI tree
+Python 3.10+, `partest>=2.0.0`, `pyyaml`, `requests` (only for `--url`). The generated UI tree
 additionally needs `pip install 'partest[ui]'` and a Playwright browser.
 
 ## License

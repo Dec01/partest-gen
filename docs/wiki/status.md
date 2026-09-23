@@ -1,7 +1,7 @@
 ---
 title: Статус, версии и что дальше
 status: current
-verified: 2026-09-06
+verified: 2026-09-13
 sources: [partest_gen/__init__.py, CHANGELOG.md]
 audience: maintainer
 ships_in_wheel: false
@@ -15,10 +15,11 @@ allow_version_literals: true
 
 | | |
 |---|---|
-| **Дата актуализации** | 2026-09-06 |
+| **Дата актуализации** | 2026-09-13 |
 | **Текущая версия** | **1.0.0** — первый выпуск отдельным дистрибутивом, ещё не на PyPI |
 | **Происхождение** | извлечён из `partest` (`partest.project_gen`), история каталога перенесена целиком |
-| **Зависимость** | `partest>=1.8.0`, минимальный Python — 3.10 |
+| **Зависимость** | `partest>=2.0.0`, минимальный Python — 3.10 |
+| **Порядок выпуска** | публикация только после выхода `partest` 2.0.0: до этого нижняя граница называет версию, которой нет на PyPI |
 | **Дистрибуция** | PyPI — пакет, GitHub — исходники и история; см. [[decisions/separate-package]] |
 
 ---
@@ -68,8 +69,8 @@ allow_version_literals: true
 
 | | |
 |---|---|
-| Минимум | `partest>=1.8.0` |
-| Что берётся | `partest.methodology.{classifier,matrix,subtypes}`, `partest.test_types`, `partest.tools.generate_init` |
+| Минимум | `partest>=2.0.0` — в 2.0.0 методика разъехалась на `api/` и `ui/`, старых путей там нет сознательно |
+| Что берётся | `partest.methodology.api.{classifier,matrix,subtypes}`, `partest.test_types`, `partest.tools.generate_init`, `partest.tls` (в UI-шаблоне) |
 | Что эмитится | только публичный `partest.*` — см. [[decisions/methodology-upstream]] |
 
 `partest` со своей стороны держит `partest.project_gen` как мост на этот пакет и экстру

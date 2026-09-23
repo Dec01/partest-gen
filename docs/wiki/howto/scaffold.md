@@ -1,7 +1,7 @@
 ---
 title: From an OpenAPI file to a collectable suite
 status: current
-verified: 2026-09-06
+verified: 2026-09-13
 sources: [partest_gen/cli.py, partest_gen/skeleton.py, partest_gen/emitters/resources.py]
 audience: user
 ships_in_wheel: true

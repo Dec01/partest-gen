@@ -6,9 +6,9 @@ import re
 from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, List, Optional, Sequence
 
-from partest.methodology.classifier import classify_endpoint
-from partest.methodology.matrix import p1_test_cases
-from partest.methodology.subtypes import MethodSubtype
+from partest.methodology.api.classifier import classify_endpoint
+from partest.methodology.api.matrix import p1_test_cases
+from partest.methodology.api.subtypes import MethodSubtype
 
 
 @dataclass

@@ -1,7 +1,7 @@
 ---
 title: partest-gen — parts of the generator
 status: current
-verified: 2026-09-06
+verified: 2026-09-13
 sources: [partest_gen/cli.py, partest_gen/ir.py, partest_gen/skeleton.py, partest_gen/openapi_load.py, partest_gen/emitters/resources.py]
 audience: agent
 ships_in_wheel: true
@@ -50,9 +50,12 @@ project tree               skeleton.py writes files, honouring the banner contra
 ```
 
 The subtype and the required case list are **not decided here**. `ir.py` calls
-`classify_endpoint` and `p1_test_cases` from `partest.methodology`, so a suite and its
+`classify_endpoint` and `p1_test_cases` from `partest.methodology.api`, so a suite and its
 generator always agree about what an endpoint is. Changing classification means changing
-`partest`.
+`partest`. The `api` in that path is an area, not a package layout detail: the harness release
+this package requires splits its methodology into an API half and a UI half, and only the API
+half is derived from a specification — which is the only half a generator reading OpenAPI can
+use. The required version is in `CHANGELOG.md`.
 
 ## 3. Target tree
 

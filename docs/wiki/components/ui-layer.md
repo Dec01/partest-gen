@@ -1,7 +1,7 @@
 ---
 title: The generated UI layer
 status: current
-verified: 2026-09-06
+verified: 2026-09-13
 sources: [partest_gen/ui_layout.py, partest_gen/skeleton.py]
 audience: user
 ships_in_wheel: true
@@ -50,6 +50,12 @@ separated is yours.
 Seeding data for a UI test is the one place the temptation appears. Do it through
 `fixtures/api_seed.py`, which talks to the API with a plain client — no coverage session, no
 specification load.
+
+Its one concession to the harness is TLS: the seed client asks
+`partest.tls.resolve_verify(None, env_only=True)` what `verify=` should be, because hardcoding
+`verify=False` in a generated file is how a project ends up unverified without ever deciding to
+be. `env_only` keeps the isolation rule: `PARTEST_TLS_VERIFY` is read, `confpartest` is not, so
+`tls_verify = False` in the project file deliberately does **not** reach a UI job.
 
 ## What stays a stub forever
 

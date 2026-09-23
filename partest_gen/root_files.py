@@ -27,7 +27,7 @@ class RootFilesContainer:
 certifi==2024.8.30
 charset-normalizer==3.4.0
 Faker>=13.12.0
-idna==3.10
+idna==3.15
 iniconfig==2.0.0
 jsonschema==4.22.0
 packaging==25.0
@@ -35,13 +35,14 @@ pluggy==1.5.0
 py==1.11.0
 pyparsing==3.0.9
 pyrsistent==0.18.1
-pytest==8.3.3
+pytest==9.0.3
 python-dateutil==2.9.0.post0
-requests==2.32.3
+requests==2.33.0
 six==1.17.0
 tomli==2.2.1
-urllib3==2.4.0
+urllib3==2.7.0
 pytest-repeat==0.9.4
+pytest-xdist==3.7.0
 pytest-asyncio>=0.23.7
 pydantic==2.9.2
 pytest-rerunfailures~=15.1
@@ -49,10 +50,9 @@ ruff==0.11.13
 allure-pytest>=2.8.18
 allure-python-commons~=2.13.5
 httpx~=0.28.1
-swagger-parser>=1.0.2
 matplotlib>=3.9.2
 pyyaml>=6.0.2
-partest>=1.7.0
+partest>=2.0.0
 fake-useragent>=2.2.0
 """
             ),
@@ -125,7 +125,14 @@ def domain(request):
 
 @pytest.fixture(scope="session")
 def api_client(domain):
-    return ApiClient(domain=domain, verify=False)
+    # Certificates are verified: partest no longer defaults to skipping the check, and a
+    # generated project must not put the old default back. A stand with a self-signed or
+    # internally signed certificate needs one line, for the whole run — preferably the CA,
+    # so the check survives:
+    #     PARTEST_TLS_VERIFY=/etc/ssl/corp-ca.pem
+    #     PARTEST_TLS_VERIFY=0                      # last resort: warns once per process
+    # A confpartest.py, if you add one, can say the same as `tls_verify = ...`.
+    return ApiClient(domain=domain)
 
 def pytest_make_parametrize_id(config, val):
     return repr(val)
