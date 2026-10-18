@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import json
+import os
+import keyword
 import re
 from pathlib import Path
-from typing import List
+from typing import Dict, List, Sequence
 
+from partest_gen._text import visible as _visible
 from partest_gen.skeleton import WriteResult, _write
 
 
@@ -14,8 +18,104 @@ GENERATED_BANNER = (
     "# Re-run: partest-gen sync-openapi <project> --file <openapi>\n"
 )
 
+# Ownership rules (docs/wiki/decisions/banner-overwrite.md, amendments of 2026-10-18).
+# A Python file is the generator's when it contains _BANNER_LINE. A Markdown checklist carries
+# the banner as a plain first line (`# ` would make it a heading) and is the generator's only
+# together with a line that reads exactly _CHECKLIST_SYNC_NOTE — a short paragraph of its own,
+# so a Markdown formatter has nothing to reflow. A checklist with _LEGACY_CHECKLIST_NOTE asks
+# to be marked by hand and belongs to the user.
+_BANNER_LINE = GENERATED_BANNER.split("\n")[0]
+_MD_BANNER_LINE = _BANNER_LINE[len("# "):]
+_CHECKLIST_SYNC_NOTE = "Rewritten on every sync."
+_LEGACY_CHECKLIST_NOTE = "Mark when implemented for real."
 
-def is_snake(name: str) -> str:
+
+def _md_lines(text: str) -> List[str]:
+    return text.lstrip("\ufeff").splitlines()
+
+
+def _is_legacy_checklist(text: str) -> bool:
+    """A checklist that asks to be marked by hand: banner line plus the legacy note."""
+    lines = _md_lines(text)
+    return bool(lines) and lines[0].startswith(_MD_BANNER_LINE) and _LEGACY_CHECKLIST_NOTE in text
+
+
+def _is_generated(rel: str, text: str, *, first_line: bool = False) -> bool:
+    """Whether the generator owns the file at ``rel`` with content ``text``.
+
+    ``first_line=True`` also requires the Python banner to open the file — used when whole
+    directories are scanned rather than paths the generator is about to write.
+    """
+    if rel.endswith(".md"):
+        lines = _md_lines(text)
+        return (
+            bool(lines)
+            and lines[0].startswith(_MD_BANNER_LINE)
+            and any(line.strip() == _CHECKLIST_SYNC_NOTE for line in lines)
+            and _LEGACY_CHECKLIST_NOTE not in text
+        )
+    if first_line:
+        return text.splitlines()[:1] == [_BANNER_LINE]
+    return _BANNER_LINE in text
+
+
+# The placeholders every released skeleton (the partest 1.5.0 baseline through partest-gen
+# 1.1.0, per git history) wrote at paths the resource emitters own. A file whose bytes are
+# exactly one of them — LF or CRLF, with or without a UTF-8 BOM — holds nothing of the user's,
+# and generation replaces it although it has no banner. Frozen: when the skeleton's text
+# changes, the new text is added here and the old one stays, so older trees stay recognised
+# (tests/test_sync_contract.py checks the current skeleton is covered).
+_RELEASED_PLACEHOLDERS: Dict[str, Sequence[str]] = {
+    "src/api/resources/endpoints/paths.py": (
+        '"""OpenAPI path constants.\n\nG2+ generator overwrites this file from OpenAPI. '
+        'Hand-edit carefully.\n"""\n\n# Example:\n# class PathsHealth:\n#     health = '
+        '"/health"\n#\n# paths_health = PathsHealth()\n',
+    ),
+    "src/api/resources/endpoints/__init__.py": ('"""Package."""\n',),
+    "src/api/resources/payloads/__init__.py": (
+        '"""Payloads package. Prefer subclassing partest.payloads.BaseRequestBody."""\n\n'
+        'from partest.payloads import BaseRequestBody\n\n__all__ = ["BaseRequestBody"]\n',
+    ),
+    "src/api/resources/validations/__init__.py": ('"""Package."""\n',),
+    "src/api/resources/validations/common/__init__.py": ('"""Package."""\n',),
+    "src/api/resources/validations/common/problem_detail.py": (
+        '"""RFC 7807 error model — re-export library preset."""\n\n'
+        "from partest.validation import ProblemDetailBody, ProblemDetailValidation\n\n"
+        "ResponseSuccessBody = ProblemDetailBody\nResponseValidation = ProblemDetailValidation\n",
+    ),
+    "src/api/resources/collections/__init__.py": ('"""Package."""\n',),
+    "src/api/resources/collections/collections_manager.py": (
+        '"""Register entity collections here (G2+ fills this)."""\n\n'
+        "from __future__ import annotations\n\nfrom typing import Optional\n\n"
+        "from partest.collections import CollectionsManager as _LibManager\n\n\n"
+        "class CollectionsManager(_LibManager):\n"
+        '    """G2 ``from-openapi`` overwrites this with named collections."""\n\n'
+        "    def __init__(self, token: Optional[str] = None):\n"
+        "        super().__init__()\n",
+    ),
+}
+
+
+def _is_skeleton_placeholder(rel: str, data: bytes) -> bool:
+    """True if ``data`` is exactly a released skeleton placeholder for ``rel``."""
+    for text in _RELEASED_PLACEHOLDERS.get(rel, ()):
+        for body in (text, text.replace("\n", "\r\n")):
+            encoded = body.encode("utf-8")
+            if data in (encoded, b"\xef\xbb\xbf" + encoded):
+                return True
+    return False
+
+
+def _esc(value: object) -> str:
+    """``value`` made safe to place between double quotes, inside a docstring or in a comment
+    of emitted Python: quotes, backslashes, line breaks and invisible characters become
+    escape sequences, so text taken from the specification can never end the literal or the
+    line it sits in, nor hide what the line says. Ordinary paths and names come back
+    unchanged."""
+    return _visible(json.dumps(str(value), ensure_ascii=False)[1:-1])
+
+
+def _snake(name: str) -> str:
     s = re.sub(r"(?<!^)(?=[A-Z])", "_", name or "")
     s = re.sub(r"[^a-zA-Z0-9_]+", "_", s)
     s = s.strip("_").lower()
@@ -24,6 +124,17 @@ def is_snake(name: str) -> str:
     if s[0].isdigit():
         s = f"p_{s}"
     return s
+
+
+def _not_keyword(s: str) -> str:
+    """A Python keyword gets a trailing ``_`` (``import`` → ``import_``): the name becomes an
+    attribute, an argument and a module. Soft keywords (``match``, ``type``) are valid names
+    and stay as they are."""
+    return f"{s}_" if keyword.iskeyword(s) else s
+
+
+def is_snake(name: str) -> str:
+    return _not_keyword(_snake(name))
 
 
 def path_to_attr(path: str) -> str:
@@ -38,10 +149,10 @@ def path_to_attr(path: str) -> str:
         if not seg:
             continue
         if seg.startswith("{") and seg.endswith("}"):
-            parts.append(f"by_{is_snake(seg[1:-1])}")
+            parts.append(f"by_{_snake(seg[1:-1])}")
         else:
-            parts.append(is_snake(seg))
-    return "_".join(parts) or "root"
+            parts.append(_snake(seg))
+    return _not_keyword("_".join(parts) or "root")
 
 
 def class_name(tag: str, prefix: str = "Paths") -> str:
@@ -68,13 +179,17 @@ def write_file(
     always: bool = False,
 ) -> None:
     """Write file. ``always=True`` overwrites generated artifacts even without force
-    when the file is missing OR already carries the generated banner.
+    when the file is missing OR the generator owns it (the rules above).
+
+    Deprecated: nothing in the package calls it; the emitters write through
+    ``emitters.resources``. Kept for callers of earlier releases.
     """
     path = root / rel
+    rel_n = rel.replace("\\", "/")
     if always and path.exists() and not force:
         try:
             existing = path.read_text(encoding="utf-8")
-            if GENERATED_BANNER.split("\n")[0] not in existing:
+            if not _is_generated(rel_n, existing):
                 result.skipped.append(rel.replace("\\", "/"))
                 return
             # has banner — overwrite as sync
@@ -86,16 +201,56 @@ def write_file(
     if always and path.exists():
         try:
             existing = path.read_text(encoding="utf-8")
-            if GENERATED_BANNER.split("\n")[0] in existing or force:
+            if _is_generated(rel_n, existing) or force:
                 path.write_text(content, encoding="utf-8", newline="\n")
-                rel_n = rel.replace("\\", "/")
                 if rel_n not in result.created and rel_n not in result.skipped:
                     result.created.append(rel_n)
                 elif rel_n in result.skipped and (
-                    GENERATED_BANNER.split("\n")[0] in existing or force
+                    _is_generated(rel_n, existing) or force
                 ):
                     result.skipped.remove(rel_n)
                     if rel_n not in result.created:
                         result.created.append(rel_n)
         except OSError:
             pass
+
+
+_WINDOWS_DEVICES = frozenset(
+    {"con", "prn", "aux", "nul"}
+    | {f"com{i}" for i in range(1, 10)}
+    | {f"lpt{i}" for i in range(1, 10)}
+)
+
+
+def _strings(value: object):
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, dict):
+        for k, v in value.items():
+            yield from _strings(k)
+            yield from _strings(v)
+    elif isinstance(value, (list, tuple)):
+        for v in value:
+            yield from _strings(v)
+
+
+def _unwritable(suite, *, windows: bool = os.name == "nt") -> List[str]:
+    """Why a generation of ``suite`` would fail halfway through writing, if it would.
+
+    A lone surrogate cannot be encoded into any file; a tag whose directory name is a Windows
+    device (``nul``, ``con``, ``aux``, …) cannot be created on Windows. Checked before the
+    first write, so a refusal leaves the tree as it was.
+    """
+    problems: List[str] = []
+    for text in _strings(suite.to_dict()):
+        if any(0xD800 <= ord(ch) <= 0xDFFF for ch in text):
+            problems.append(f"lone surrogate in {_visible(text)[:60]!r}")
+            break
+    if windows:
+        for tag in suite.tags():
+            if is_snake(tag) in _WINDOWS_DEVICES:
+                problems.append(
+                    f"tag {_visible(tag)!r} would be the directory {is_snake(tag)!r}, "
+                    "a device name Windows does not allow"
+                )
+    return problems

@@ -63,6 +63,7 @@ ships_in_wheel: false
 | `CHANGELOG.md` | что менялось по версиям |
 | `docs/PYPI.md` | текст страницы PyPI (`long_description`) |
 | `docs/wiki/log.md` | журнал операций над документацией |
+| `docs/wiki/proposals.md` | спорные предложения, ждущие решения человека |
 
 ## Соседний репозиторий
 

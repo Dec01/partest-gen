@@ -49,6 +49,8 @@ nosetests.xml
 .tox/
 .nox/
 .benchmarks/
+# partest writes its run state here when the test suite runs
+.partest/
 
 # Allure (generated)
 /allure-reports/

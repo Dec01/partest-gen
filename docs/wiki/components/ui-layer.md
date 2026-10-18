@@ -1,7 +1,7 @@
 ---
 title: The generated UI layer
 status: current
-verified: 2026-09-23
+verified: 2026-10-18
 sources: [partest_gen/ui_layout.py, partest_gen/skeleton.py]
 audience: user
 ships_in_wheel: true
@@ -46,6 +46,13 @@ This is not a style preference. A UI job that pulls in the API session becomes s
 network access to fetch a specification it never uses, and fails for reasons that have nothing
 to do with the browser. The generator emits the two trees already separated; keeping them
 separated is yours.
+
+What the generated conftest cannot hold on its own: `partest` imports its coverage module, and
+tries `confpartest` with it, as soon as the harness is imported — by its pytest plugin, before
+any conftest. A UI run from the project root has always made that attempt. Without the root
+on `sys.path` it found nothing and loaded no specification; with `pythonpath = .` in the
+generated `pytest.ini`, as with `python -m pytest`, it loads the one `confpartest` names. The
+cause is on the `partest` side; the generated UI tree itself imports neither.
 
 Seeding data for a UI test is the one place the temptation appears. Do it through
 `fixtures/api_seed.py`, which talks to the API with a plain client — no coverage session, no

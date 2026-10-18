@@ -35,4 +35,4 @@ def test_requirements_carry_the_audited_floors():
     requirements = _content("requirements.txt")
     for pin in ("urllib3==2.7.0", "requests==2.33.0", "idna==3.15", "pytest==9.0.3"):
         assert pin in requirements, f"missing audited pin {pin}"
-    assert "partest>=2.0.0" in requirements
+    assert "partest>=2.1.0" in requirements

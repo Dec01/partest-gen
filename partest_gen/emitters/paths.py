@@ -7,6 +7,7 @@ from typing import Dict, List, Optional, Sequence, Set
 
 from partest_gen.emitters.util import (
     GENERATED_BANNER,
+    _esc,
     class_name,
     is_snake,
     path_to_attr,
@@ -32,9 +33,9 @@ def build_paths_module(
     """Return full Python source for paths.py."""
     allowed = {is_snake(t) for t in tags_filter} if tags_filter else None
     by_tag: Dict[str, List[OpIR]] = defaultdict(list)
+    # Deprecated operations keep their constants: the operation is still in the specification,
+    # and a test written for it (or a stub generated before the deprecation) must still import.
     for op in suite.operations:
-        if op.deprecated:
-            continue
         tag = is_snake(op.tag)
         if allowed is not None and tag not in allowed:
             continue
@@ -69,7 +70,9 @@ def build_paths_module(
         used: Set[str] = set()
         # unique paths -> attr
         path_map: Dict[str, str] = {}
-        for op in ops:
+        # live operations name their paths first: a deprecated twin never takes the plain
+        # name from the endpoint tests are meant to call
+        for op in sorted(ops, key=lambda o: o.deprecated):
             if op.path not in path_map:
                 path_map[op.path] = _unique_attr(path_to_attr(op.path), used)
 
@@ -83,13 +86,14 @@ def build_paths_module(
             lines.append("        pass")
         else:
             for path, attr in sorted(path_map.items(), key=lambda x: x[1]):
-                lines.append(f'        self.{attr} = "{path}"')
+                lines.append(f'        self.{attr} = "{_esc(path)}"')
         lines.append("")
         # also document methods as comments
         lines.append("    # operations:")
         for op in sorted(ops, key=lambda o: (o.path, o.method)):
             lines.append(
-                f"    #   {op.method:6} {op.path}  subtype={op.subtype}  id={op.operation_id}"
+                f"    #   {op.method:6} {_esc(op.path)}  subtype={op.subtype}  "
+                f"id={_esc(op.operation_id)}"
             )
         lines.append("")
         lines.append("")

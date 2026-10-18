@@ -114,6 +114,10 @@ components:
           type: string
         parentId:
           type: integer
+        ownerId:
+          type: integer
+        note:
+          type: string
     Item:
       type: object
       required: [id, name]

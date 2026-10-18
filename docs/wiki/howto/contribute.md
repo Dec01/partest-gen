@@ -1,7 +1,7 @@
 ---
 title: Разработка генератора
 status: current
-verified: 2026-09-23
+verified: 2026-10-18
 sources: [partest_gen/skeleton.py, partest_gen/emitters/util.py, tests/test_golden_suite.py, tools/check_all.py]
 audience: maintainer
 ships_in_wheel: false
@@ -59,7 +59,10 @@ python tools/check_all.py
 | `partest_gen/cli.py` | разбор аргументов и последовательность команд |
 | `partest_gen/openapi_load.py` | чтение спеки: файл или URL, YAML или JSON |
 | `partest_gen/ir.py` | спека → `SuiteIR`; здесь же вызов классификатора из `partest` |
-| `partest_gen/skeleton.py` | дерево проекта, корневые файлы, запись на диск и политика перезаписи |
+| `partest_gen/skeleton.py` | дерево проекта, корневые файлы и их запись на диск |
+| `partest_gen/emitters/resources.py` | план сгенерированных файлов, запись по политике баннера, поиск брошенных |
+| `partest_gen/emitters/util.py` | баннер и его распознавание, заготовки скелета, экранирование текста спеки (`_esc`) |
+| `partest_gen/_fsguard.py` | куда можно писать: внутри проекта и не через ссылки — через него идёт каждая запись и удаление |
 | `partest_gen/emitters/*` | по эмиттеру на артефакт; ни один не пишет на диск сам |
 | `partest_gen/ui_layout.py` | всё `src/ui` целиком |
 | `partest_gen/models_*.py` | легаси до IR; новый код туда не добавляем |
@@ -81,8 +84,8 @@ python tools/check_all.py
 Проверка «а что реально получилось» — руками, один раз, на настоящей спеке:
 
 ```bash
-partest-gen from-openapi /tmp/check --file tests/fixtures/sample_openapi.yaml --depth p1 --with-ui --force
-cd /tmp/check && python -m pytest src/api/tests --collect-only -q
+partest-gen from-openapi /tmp/check --file tests/fixtures/sample_openapi.yaml --depth p1 --with-ui
+cd /tmp/check && pytest src/api/tests --collect-only -q
 ```
 
 ## Тесты
@@ -95,6 +98,7 @@ cd /tmp/check && python -m pytest src/api/tests --collect-only -q
 | `tests/test_g4_p1_stubs.py` | набор P1-заглушек и чек-листы |
 | `tests/test_g5_ui_layout.py` | UI-дерево и его изоляция |
 | `tests/test_golden_suite.py` | e2e: спека → дерево → импорт и сбор |
+| `tests/test_sync_contract.py` | первый прогон без `--force`, sync чек-листа, `pythonpath`, брошенные файлы, засеваемый пол `partest` |
 | `tests/test_cli.py` | команды CLI и `--version` |
 | `tests/test_docs.py` | линтер доков внутри pytest, состав колеса |
 

@@ -52,13 +52,14 @@ allure-python-commons~=2.13.5
 httpx~=0.28.1
 matplotlib>=3.9.2
 pyyaml>=6.0.2
-partest>=2.0.0
+partest>=2.1.0
 fake-useragent>=2.2.0
 """
             ),
             RootFile(
                 name="pytest.ini",
                 content="""[pytest]
+pythonpath = .
 log_cli = 1
 log_cli_level = INFO
 log_cli_format = %(message)s

@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Dict, List, Optional, Sequence, Tuple
 
 from partest_gen.emitters.util import (
+    _esc,
     GENERATED_BANNER,
     collection_class_name,
     is_snake,
@@ -78,7 +79,7 @@ def build_collection_module(
     lines.append("class ModelsPaths:")
     if path_attrs:
         for path, attr in sorted(path_attrs.items(), key=lambda x: x[1]):
-            lines.append(f"    {attr} = paths.paths_{tag_s}.{attr}  # {path}")
+            lines.append(f"    {attr} = paths.paths_{tag_s}.{attr}  # {_esc(path)}")
     else:
         lines.append("    pass")
     lines.extend(
@@ -120,7 +121,7 @@ def build_collection_module(
     if ops_summary:
         lines.append("# OpenAPI operations:")
         for line in ops_summary:
-            lines.append(f"#   {line}")
+            lines.append(f"#   {_esc(line)}")
         lines.append("")
     return "\n".join(lines)
 

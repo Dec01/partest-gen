@@ -1,7 +1,7 @@
 ---
 title: Turning stubs into tests
 status: current
-verified: 2026-09-06
+verified: 2026-10-18
 sources: [partest_gen/emitters/tests_p1.py, partest_gen/emitters/tests_default.py, partest_gen/emitters/payloads.py]
 audience: user
 ships_in_wheel: true

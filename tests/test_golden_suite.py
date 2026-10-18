@@ -183,8 +183,10 @@ def test_golden_ui_collect_only(golden_suite: Path):
     assert "test_" in r.stdout
 
 
-def test_sync_openapi_idempotent_banner(golden_suite: Path):
-    """Second sync-openapi should not explode; summary stays."""
+def test_sync_openapi_idempotent_banner(golden_suite: Path, capsys):
+    """Second sync-openapi should not explode; summary stays; the unchanged spec leaves
+    nothing behind as an orphan and nothing generated as skipped."""
+    capsys.readouterr()
     rc = cli_main(
         [
             "sync-openapi",
@@ -197,3 +199,6 @@ def test_sync_openapi_idempotent_banner(golden_suite: Path):
     )
     assert rc == 0
     assert (golden_suite / ".partest/suite_ir.json").is_file()
+    out = capsys.readouterr().out
+    assert "Orphaned" not in out
+    assert "Skipped: 0" in out

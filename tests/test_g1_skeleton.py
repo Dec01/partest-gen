@@ -92,13 +92,14 @@ def test_skeleton_documents_tls_instead_of_disabling_it(tmp_path: Path):
 
 
 def test_skeleton_requirements_floor_matches_methodology_layout(tmp_path: Path):
-    """Emitted code reads partest.methodology.api, which only exists from 2.0.0."""
+    """Emitted code reads partest.methodology.api, which only exists from 2.0.0; the seeded
+    floor follows our own (2.1.0 — the 2.0.x line declares vulnerable floors of its own)."""
     result = init_skeleton(tmp_path / "reqs", name="shop", force=True)
     root = Path(result.root)
     api = (root / "requirements/api.txt").read_text(encoding="utf-8")
     ui = (root / "requirements/ui.txt").read_text(encoding="utf-8")
-    assert "partest>=2.0.0" in api
-    assert "partest[ui]>=2.0.0" in ui
+    assert "partest>=2.1.0" in api
+    assert "partest[ui]>=2.1.0" in ui
 
 
 def test_skeleton_requirements_seed_audited_floors(tmp_path: Path):

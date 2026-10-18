@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Tuple
 
-from partest_gen.emitters.util import is_snake, path_to_attr
+import json
+import keyword
+
+from partest_gen.emitters.util import _esc, is_snake, path_to_attr
 
 
 def op_module_stem(method: str, path: str) -> str:
@@ -74,8 +77,8 @@ def payload_default_expr(name: str, schema: Optional[Dict[str, Any]]) -> str:
         if "code" in lname:
             return f'lambda: marked_code("{is_snake(name)[:8].upper() or "X"}")'
         if lname in {"name", "title", "label"} or lname.endswith("name"):
-            return f'lambda: marked_name("{name[:24]}")'
-        return f'lambda: marked_name("{name[:24]}")'
+            return f'lambda: marked_name("{_esc(name[:24])}")'
+        return f'lambda: marked_name("{_esc(name[:24])}")'
 
     if t == "integer":
         if lname.endswith("id") or lname.endswith("_id"):
@@ -139,7 +142,7 @@ def build_payload_class_source(
         f"class {class_name}(BaseRequestBody):",
     ]
     if module_doc:
-        lines.append(f'    """{module_doc}"""')
+        lines.append(f'    """{_esc(module_doc)}"""')
         lines.append("")
     if not props:
         lines.append("    _required = []")
@@ -154,10 +157,40 @@ def build_payload_class_source(
         if not isinstance(name, str):
             continue
         expr = payload_default_expr(name, sub if isinstance(sub, dict) else None)
-        lines.append(f'        "{name}": {expr},')
+        # a default may carry a trailing comment; the comma has to come before it
+        value, sep, comment = expr.partition("  # ")
+        lines.append(f'        "{_esc(name)}": {value},{sep}{comment}')
     lines.append("    }")
     lines.append("")
     return "\n".join(lines)
+
+
+# Names the emitted model module itself uses: a field with one of them would shadow it in
+# the class body, and pydantic then fails while the module is imported.
+_MODULE_NAMES = frozenset(
+    {
+        "Any", "BaseModel", "BaseModelWithConfig", "BaseResponseValidator", "ConfigDict",
+        "Dict", "Field", "List", "Optional", "RootModel", "Type", "annotations",
+        "bool", "float", "int", "str",
+    }
+)
+
+
+def _field_line(name: str, ann: str, *, required: bool) -> str:
+    """One pydantic field. A property name that cannot be a field as it is — not an
+    identifier, a keyword, a name the module uses, a private (``_x``) or pydantic-reserved
+    (``model_x``) name — becomes ``field_<snake>`` with the original name as the alias, so it
+    can neither break the module nor inject code into it."""
+    default = "..." if required else "None"
+    if (
+        name.isidentifier()
+        and not keyword.iskeyword(name)
+        and name not in _MODULE_NAMES
+        and not name.startswith(("_", "model_"))
+    ):
+        return f"    {name}: {ann} = Field({default})"
+    alias = json.dumps(name)
+    return f"    field_{is_snake(name)}: {ann} = Field({default}, alias={alias})"
 
 
 def build_validation_module_source(
@@ -218,7 +251,7 @@ def build_validation_module_source(
     else:
         lines.append("class ResponseSuccessBody(BaseModelWithConfig):")
         if module_doc:
-            lines.append(f'    """{module_doc}"""')
+            lines.append(f'    """{_esc(module_doc)}"""')
             lines.append("")
         for name, sub in props.items():
             if not isinstance(name, str):
@@ -226,9 +259,9 @@ def build_validation_module_source(
             req = name in required
             ann = pydantic_annotation(sub if isinstance(sub, dict) else None, required=req)
             if req:
-                lines.append(f"    {is_snake(name) if False else name}: {ann} = Field(...)")
+                lines.append(_field_line(name, ann, required=True))
             else:
-                lines.append(f"    {name}: {ann} = Field(None)")
+                lines.append(_field_line(name, ann, required=False))
         lines.append("")
         lines.append("")
         if is_list:
@@ -250,10 +283,7 @@ def build_validation_module_source(
                     continue
                 req = name in required
                 ann = pydantic_annotation(sub if isinstance(sub, dict) else None, required=req)
-                if req:
-                    lines.append(f"    {name}: {ann} = Field(...)")
-                else:
-                    lines.append(f"    {name}: {ann} = Field(None)")
+                lines.append(_field_line(name, ann, required=req))
             lines.extend(
                 [
                     "",

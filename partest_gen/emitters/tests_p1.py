@@ -6,7 +6,14 @@ from collections import defaultdict
 from typing import Dict, List, Optional, Sequence, Set, Tuple
 
 from partest_gen.emitters.schema_py import op_module_stem
-from partest_gen.emitters.util import GENERATED_BANNER, is_snake, path_to_attr
+from partest_gen.emitters.util import (
+    GENERATED_BANNER,
+    _esc,
+    _CHECKLIST_SYNC_NOTE,
+    is_snake,
+    path_to_attr,
+)
+from partest_gen._text import md_code
 from partest_gen.ir import OpIR, SuiteIR
 from partest.test_types import TYPE_LABELS, TypesTestCases as T
 
@@ -86,7 +93,7 @@ def _emit_permissions(tag: str, ops: List[OpIR], path_attrs: Dict[str, str]) -> 
         stem = op_module_stem(op.method, op.path)
         needs_id = bool(op.path_params)
         lines.append("    @ah.testcase(")
-        lines.append(f'        title="{op.method} {op.path} permissions",')
+        lines.append(f'        title="{op.method} {_esc(op.path)} permissions",')
         lines.append('        story="RequestPermissions",')
         lines.append("    )")
         if needs_id:
@@ -107,7 +114,7 @@ def _emit_permissions(tag: str, ops: List[OpIR], path_attrs: Dict[str, str]) -> 
         lines.append("        await api_client.make_request(")
         lines.append(f'            "{op.method}",')
         lines.append(f"            models.{tag_s}.paths.{attr},")
-        lines.append(f'            defining_url="{op.path}",')
+        lines.append(f'            defining_url="{_esc(op.path)}",')
         lines.append("            headers=headers,")
         lines.append("            expected_status_code=401,")
         lines.append("            type=types.request_permissions,")
@@ -131,7 +138,7 @@ def _emit_not_found(tag: str, ops: List[OpIR], path_attrs: Dict[str, str]) -> st
         attr = _path_attr(op.path, path_attrs)
         stem = op_module_stem(op.method, op.path)
         lines.append("    @ah.testcase(")
-        lines.append(f'        title="{op.method} {op.path} not found",')
+        lines.append(f'        title="{op.method} {_esc(op.path)} not found",')
         lines.append('        story="RequestNotFound",')
         lines.append("    )")
         lines.append(f"    async def test_{stem}_not_found(self, api_client, models):")
@@ -143,7 +150,7 @@ def _emit_not_found(tag: str, ops: List[OpIR], path_attrs: Dict[str, str]) -> st
             lines.append(f'            "{op.method}",')
             lines.append(f"            models.{tag_s}.paths.{attr},")
             lines.append(f'            add_url1="{fake}",  # TODO: align with path template')
-            lines.append(f'            defining_url="{op.path}",')
+            lines.append(f'            defining_url="{_esc(op.path)}",')
             lines.append(f"            headers=models.{tag_s}.headers.read,")
             lines.append("            expected_status_code=404,")
             lines.append("            type=types.request_not_found,")
@@ -173,7 +180,7 @@ def _emit_incorrect_body(tag: str, ops: List[OpIR], path_attrs: Dict[str, str]) 
         stem = op_module_stem(op.method, op.path)
         needs_id = bool(op.path_params)
         lines.append("    @ah.testcase(")
-        lines.append(f'        title="{op.method} {op.path} incorrect body",')
+        lines.append(f'        title="{op.method} {_esc(op.path)} incorrect body",')
         lines.append('        story="RequestIncorrectBody",')
         lines.append("    )")
         if needs_id:
@@ -195,7 +202,7 @@ def _emit_incorrect_body(tag: str, ops: List[OpIR], path_attrs: Dict[str, str]) 
         lines.append("            content=content,")
         lines.append("            content_type=content_type,")
         lines.append("            expected_status_code=expected,")
-        lines.append(f'            defining_url="{op.path}",')
+        lines.append(f'            defining_url="{_esc(op.path)}",')
         lines.append("        )")
         lines.append("")
     return "\n".join(lines)
@@ -211,7 +218,7 @@ def _emit_elements(tag: str, ops: List[OpIR], path_attrs: Dict[str, str]) -> str
         stem = op_module_stem(op.method, op.path)
         needs_id = bool(op.path_params)
         lines.append("    @ah.testcase(")
-        lines.append(f'        title="{op.method} {op.path} elements",')
+        lines.append(f'        title="{op.method} {_esc(op.path)} elements",')
         lines.append('        story="RequestElements",')
         lines.append("    )")
         if needs_id:
@@ -227,7 +234,7 @@ def _emit_elements(tag: str, ops: List[OpIR], path_attrs: Dict[str, str]) -> str
         lines.append("            await api_client.make_request(")
         lines.append(f'                "{op.method}",')
         lines.append(f"                models.{tag_s}.paths.{attr},")
-        lines.append(f'                defining_url="{op.path}",')
+        lines.append(f'                defining_url="{_esc(op.path)}",')
         lines.append(f"                headers=models.{tag_s}.headers.write,")
         lines.append("                json_data=body,")
         lines.append("                expected_status_code=400,")
@@ -252,7 +259,7 @@ def _emit_extra_data(tag: str, ops: List[OpIR], path_attrs: Dict[str, str]) -> s
         needs_id = bool(op.path_params)
         status = op.success_status if op.method == "POST" else op.success_status
         lines.append("    @ah.testcase(")
-        lines.append(f'        title="{op.method} {op.path} extra data",')
+        lines.append(f'        title="{op.method} {_esc(op.path)} extra data",')
         lines.append('        story="RequestExtraData",')
         lines.append("    )")
         if needs_id:
@@ -266,7 +273,7 @@ def _emit_extra_data(tag: str, ops: List[OpIR], path_attrs: Dict[str, str]) -> s
         lines.append("        response = await api_client.make_request(")
         lines.append(f'            "{op.method}",')
         lines.append(f"            models.{tag_s}.paths.{attr},")
-        lines.append(f'            defining_url="{op.path}",')
+        lines.append(f'            defining_url="{_esc(op.path)}",')
         lines.append(f"            headers=models.{tag_s}.headers.write,")
         lines.append("            json_data=body,")
         lines.append(f"            expected_status_code={status},  # or 400 if API rejects unknown")
@@ -289,7 +296,7 @@ def _emit_new_object(tag: str, ops: List[OpIR], path_attrs: Dict[str, str]) -> s
         attr = _path_attr(op.path, path_attrs)
         stem = op_module_stem(op.method, op.path)
         lines.append("    @ah.testcase(")
-        lines.append(f'        title="vertical new object via {op.method} {op.path}",')
+        lines.append(f'        title="vertical new object via {op.method} {_esc(op.path)}",')
         lines.append('        story="RequestNewObject",')
         lines.append("    )")
         lines.append(f"    async def test_{stem}_new_object(self, api_client, models):")
@@ -301,7 +308,7 @@ def _emit_new_object(tag: str, ops: List[OpIR], path_attrs: Dict[str, str]) -> s
         lines.append("        created = await api_client.make_request(")
         lines.append(f'            "POST",')
         lines.append(f"            models.{tag_s}.paths.{attr},")
-        lines.append(f'            defining_url="{op.path}",')
+        lines.append(f'            defining_url="{_esc(op.path)}",')
         lines.append(f"            headers=models.{tag_s}.headers.write,")
         lines.append("            json_data=payload.json,")
         lines.append(f"            expected_status_code={op.success_status},")
@@ -325,7 +332,7 @@ def _emit_update_object(tag: str, ops: List[OpIR], path_attrs: Dict[str, str]) -
         attr = _path_attr(op.path, path_attrs)
         stem = op_module_stem(op.method, op.path)
         lines.append("    @ah.testcase(")
-        lines.append(f'        title="vertical update via {op.method} {op.path}",')
+        lines.append(f'        title="vertical update via {op.method} {_esc(op.path)}",')
         lines.append('        story="RequestUpdateObject",')
         lines.append("    )")
         lines.append(
@@ -338,7 +345,7 @@ def _emit_update_object(tag: str, ops: List[OpIR], path_attrs: Dict[str, str]) -
         lines.append(f'            "{op.method}",')
         lines.append(f"            models.{tag_s}.paths.{attr},")
         lines.append('            # add_url1=f"/{entity_id}",')
-        lines.append(f'            defining_url="{op.path}",')
+        lines.append(f'            defining_url="{_esc(op.path)}",')
         lines.append(f"            headers=models.{tag_s}.headers.write,")
         lines.append("            json_data=payload.json,")
         lines.append(f"            expected_status_code={op.success_status},")
@@ -356,7 +363,7 @@ def _emit_benchmark(tag: str, ops: List[OpIR], path_attrs: Dict[str, str]) -> st
         stem = op_module_stem(op.method, op.path)
         needs_id = bool(op.path_params)
         lines.append("    @ah.testcase(")
-        lines.append(f'        title="{op.method} {op.path} benchmark",')
+        lines.append(f'        title="{op.method} {_esc(op.path)} benchmark",')
         lines.append('        story="RequestCompareBenchmark",')
         lines.append("    )")
         if needs_id:
@@ -366,7 +373,7 @@ def _emit_benchmark(tag: str, ops: List[OpIR], path_attrs: Dict[str, str]) -> st
         lines.append("        response = await api_client.make_request(")
         lines.append(f'            "{op.method}",')
         lines.append(f"            models.{tag_s}.paths.{attr},")
-        lines.append(f'            defining_url="{op.path}",')
+        lines.append(f'            defining_url="{_esc(op.path)}",')
         lines.append(f"            headers=models.{tag_s}.headers.read,")
         lines.append(f"            expected_status_code={op.success_status},")
         lines.append(
@@ -387,7 +394,7 @@ def _emit_params(tag: str, ops: List[OpIR], path_attrs: Dict[str, str]) -> str:
         attr = _path_attr(op.path, path_attrs)
         stem = op_module_stem(op.method, op.path)
         lines.append("    @ah.testcase(")
-        lines.append(f'        title="{op.method} {op.path} params",')
+        lines.append(f'        title="{op.method} {_esc(op.path)} params",')
         lines.append('        story="RequestsParams",')
         lines.append("    )")
         lines.append(
@@ -398,12 +405,12 @@ def _emit_params(tag: str, ops: List[OpIR], path_attrs: Dict[str, str]) -> str:
         qnames = [p.name for p in op.query_params] or ["page", "size"]
         lines.append(f"        params = {{  # suggested from OpenAPI: {qnames!r}")
         for q in qnames[:4]:
-            lines.append(f'            "{q}": 1,')
+            lines.append(f'            "{_esc(q)}": 1,')
         lines.append("        }")
         lines.append("        response = await api_client.make_request(")
         lines.append(f'            "{op.method}",')
         lines.append(f"            models.{tag_s}.paths.{attr},")
-        lines.append(f'            defining_url="{op.path}",')
+        lines.append(f'            defining_url="{_esc(op.path)}",')
         lines.append("            params=params,")
         lines.append(f"            headers=models.{tag_s}.headers.read,")
         lines.append(f"            expected_status_code={op.success_status},")
@@ -491,12 +498,17 @@ def build_p1_test_files(
             GENERATED_BANNER + f'"""Tests for `{tag}`."""\n',
         )
 
-        # checklist markdown for humans/agents
+        # checklist markdown for humans/agents. The banner goes in as a plain line (`# ` would
+        # be a heading); together with the _CHECKLIST_SYNC_NOTE line — a paragraph of its
+        # own, so formatters leave it whole — it marks the file as the generator's.
         checklist = [
-            GENERATED_BANNER.replace("# ", ""),  # not valid md with #
+            GENERATED_BANNER.replace("# ", ""),
             f"# P1 coverage checklist — `{tag}`",
             "",
-            "Generated from methodology matrix. Mark when implemented for real.",
+            _CHECKLIST_SYNC_NOTE,
+            "",
+            "Generated from the methodology matrix. Track progress in the coverage report",
+            "(`missing_p1`), not here.",
             "",
             "| Operation | Subtype | P1 TC | Stub file |",
             "|-----------|---------|-------|-----------|",
@@ -509,7 +521,7 @@ def build_p1_test_files(
                 else:
                     stub = f"test_{tag}_{_FILE_SUFFIX.get(tc, tc)}.py"
                 checklist.append(
-                    f"| {op.method} `{op.path}` | `{op.subtype}` | {label} | `{stub}` |"
+                    f"| {op.method} {md_code(op.path)} | `{op.subtype}` | {label} | `{stub}` |"
                 )
         checklist.append("")
         files[f"src/api/tests/{tag}/P1_CHECKLIST.md"] = "\n".join(checklist)

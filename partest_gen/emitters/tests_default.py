@@ -6,7 +6,7 @@ from collections import defaultdict
 from typing import Dict, List, Optional, Sequence, Set, Tuple
 
 from partest_gen.emitters.schema_py import op_module_stem
-from partest_gen.emitters.util import GENERATED_BANNER, is_snake, path_to_attr
+from partest_gen.emitters.util import GENERATED_BANNER, _esc, is_snake, path_to_attr
 from partest_gen.ir import OpIR, SuiteIR
 
 _VERBS = ["GET", "POST", "PUT", "PATCH", "DELETE"]
@@ -61,13 +61,13 @@ def build_default_test_module(
         use_write = op.method in {"POST", "PUT", "PATCH", "DELETE"}
 
         lines.append("    @ah.testcase(")
-        lines.append(f'        title="{op.method} {op.path} default",')
+        lines.append(f'        title="{op.method} {_esc(op.path)} default",')
         lines.append('        story="RequestDefault",')
         lines.append("    )")
         if needs_id:
             lines.append("    @pytest.mark.skip(reason=\"TODO: provide path params / seed id\")")
         lines.append(f"    async def {test_name}(self, api_client, models):")
-        lines.append(f'        """{op.summary or op.operation_id} — subtype `{op.subtype}`."""')
+        lines.append(f'        """{_esc(op.summary or op.operation_id)} — subtype `{op.subtype}`."""')
         if has_body:
             lines.append(f"        payload = models.{tag_s}.payload.{stem}()")
             lines.append(f"        # TODO: set FK fields via payload.set_payload_field(...)")
@@ -77,9 +77,9 @@ def build_default_test_module(
         lines.append(f"            models.{tag_s}.paths.{attr},")
         if needs_id:
             lines.append('            # add_url1="/{id}",  # TODO')
-            lines.append(f'            defining_url="{op.path}",')
+            lines.append(f'            defining_url="{_esc(op.path)}",')
         else:
-            lines.append(f'            defining_url="{op.path}",')
+            lines.append(f'            defining_url="{_esc(op.path)}",')
         lines.append(f"            headers=models.{tag_s}.headers.{headers},")
         if has_body:
             lines.append("            json_data=payload.json,")
@@ -144,7 +144,7 @@ def build_not_allowed_test_module(
         test_name = f"test_{method.lower()}_{path_to_attr(path)}_not_allowed"
         any_case = True
         lines.append("    @ah.testcase(")
-        lines.append(f'        title="{method} {path} not allowed",')
+        lines.append(f'        title="{method} {_esc(path)} not allowed",')
         lines.append('        story="RequestNotAllowed",')
         lines.append("    )")
         if needs_id:
@@ -158,7 +158,7 @@ def build_not_allowed_test_module(
         lines.append("        await api_client.make_request(")
         lines.append(f'            "{method}",')
         lines.append(f"            models.{tag_s}.paths.{attr},")
-        lines.append(f'            defining_url="{path}",')
+        lines.append(f'            defining_url="{_esc(path)}",')
         lines.append(f"            headers=models.{tag_s}.headers.read,")
         lines.append("            expected_status_code=405,")
         lines.append("            type=types.request_not_allowed,")

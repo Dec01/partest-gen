@@ -1,7 +1,7 @@
 ---
 title: ADR — методология остаётся в partest
 status: current
-verified: 2026-09-13
+verified: 2026-10-18
 sources: [partest_gen/ir.py]
 audience: maintainer
 ships_in_wheel: false

@@ -66,6 +66,10 @@ pytest src/api/tests --collect-only -q
 Collect-only is the acceptance test for a generation: every emitted module imports, every test
 is discovered, nothing runs. If this is green, the tree is sound and the rest is your work.
 
+`--force` is not needed for a new directory. The generated `pytest.ini` puts the project root on
+`sys.path` (`pythonpath = .`), so a bare `pytest` and `python -m pytest` see the same
+`confpartest` — without it the coverage report comes out empty with every test green.
+
 A red collect almost always means the specification used a shape the emitters could not
 express. The error names the file; the operation it came from is in
 `.partest/openapi_summary.md`.
@@ -75,7 +79,7 @@ express. The error names the file; the operation it came from is in
 | File | What it tells you |
 |---|---|
 | `.partest/openapi_summary.md` | every operation, its subtype, the cases it needs |
-| `src/api/tests/<tag>/P1_CHECKLIST.md` | the same as a per-tag backlog you can tick off |
+| `src/api/tests/<tag>/P1_CHECKLIST.md` | the same as a per-tag backlog; rewritten by every sync, so progress lives in the coverage report |
 | `src/api/resources/endpoints/paths.py` | the path constants to use instead of raw strings |
 
 ## 6. Wire the environment

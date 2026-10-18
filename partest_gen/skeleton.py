@@ -5,8 +5,10 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence, Union
+from typing import Dict, List, Optional, Union
 
+from partest_gen._fsguard import safe_target
+from partest_gen._text import md_code, md_text
 from partest_gen.ir import SuiteIR
 from partest_gen.ui_layout import build_ui_files
 
@@ -16,6 +18,8 @@ class WriteResult:
     created: List[str] = field(default_factory=list)
     skipped: List[str] = field(default_factory=list)
     root: str = ""
+    #: paths not written because a link (junction, symlink) lies on the way out of the project
+    refused: List[str] = field(default_factory=list)
 
 
 def _write(
@@ -26,13 +30,18 @@ def _write(
     force: bool,
     result: WriteResult,
 ) -> None:
-    path = root / rel
+    rel_n = rel.replace("\\", "/")
+    path = safe_target(root.resolve(), rel_n)
+    if path is None:
+        # a link (junction, symlink) on the way, or a path that leaves the project
+        result.refused.append(rel_n)
+        return
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists() and not force:
-        result.skipped.append(rel.replace("\\", "/"))
+        result.skipped.append(rel_n)
         return
     path.write_text(content, encoding="utf-8", newline="\n")
-    result.created.append(rel.replace("\\", "/"))
+    result.created.append(rel_n)
 
 
 def _py_init() -> str:
@@ -47,13 +56,16 @@ def apply_ui_layout(
     result: Optional[WriteResult] = None,
 ) -> WriteResult:
     """Write G5 UI tree into an existing project root."""
+    root = Path(root).resolve()
     if result is None:
-        result = WriteResult(root=str(root.resolve()))
+        result = WriteResult(root=str(root))
     for rel, content in build_ui_files(project_name=name).items():
         _write(root, rel, content, force=force, result=result)
     # extend env.example if present
-    env_path = root / "env.example"
-    if env_path.is_file():
+    env_path = safe_target(root, "env.example")
+    if env_path is None:
+        result.refused.append("env.example")
+    elif env_path.is_file():
         text = env_path.read_text(encoding="utf-8")
         if "FRONTEND_URL" not in text:
             text += (
@@ -68,8 +80,10 @@ def apply_ui_layout(
                 rel = "env.example"
                 if rel not in result.created and rel not in result.skipped:
                     result.created.append(rel + " (UI keys)")
-    gitignore = root / ".gitignore"
-    if gitignore.is_file():
+    gitignore = safe_target(root, ".gitignore")
+    if gitignore is None:
+        result.refused.append(".gitignore")
+    elif gitignore.is_file():
         gi = gitignore.read_text(encoding="utf-8")
         extra = "\nsrc/ui/baselines/actual/\nsrc/ui/baselines/diff/\n"
         if "baselines/actual" not in gi:
@@ -100,6 +114,48 @@ def init_skeleton(
     if openapi_source:
         openapi_conf = openapi_source
 
+    files = _skeleton_files(safe_name, openapi_conf, with_ui)
+
+    for rel, content in files.items():
+        _write(root, rel, content, force=force, result=result)
+
+    # IR dump for G1 inspectability
+    if suite_ir is not None:
+        _write(
+            root,
+            ".partest/suite_ir.json",
+            json.dumps(suite_ir.to_dict(), ensure_ascii=False, indent=2),
+            force=force,
+            result=result,
+        )
+
+        lines = [
+            f"# OpenAPI IR summary — {md_text(suite_ir.title)}",
+            "",
+            f"- version: {md_code(suite_ir.version)}",
+            f"- openapi: {md_code(suite_ir.openapi_version)}",
+            f"- source: {md_code(suite_ir.source)}",
+            f"- operations: **{len(suite_ir.operations)}**",
+            f"- tags: {md_text(', '.join(suite_ir.tags())) or '—'}",
+            "",
+            "| Method | Path | Tag | Subtype | P1 TC |",
+            "|--------|------|-----|---------|-------|",
+        ]
+        for op in suite_ir.operations:
+            p1 = ", ".join(op.required_p1) if op.required_p1 else "—"
+            lines.append(
+                f"| {op.method} | {md_code(op.path)} | {md_text(op.tag)} | `{op.subtype}` | {p1} |"
+            )
+        lines.append("")
+        lines.append("Entity tests generation: **G3+** (`partest-gen from-openapi --depth p1`).")
+        lines.append("")
+        _write(root, ".partest/openapi_summary.md", "\n".join(lines), force=force, result=result)
+
+    return result
+
+
+def _skeleton_files(safe_name: str, openapi_conf: str, with_ui: bool) -> Dict[str, str]:
+    """``rel_path -> content`` of the G1 skeleton (and the UI tree with ``with_ui``)."""
     files: Dict[str, str] = {}
 
     # --- root ---
@@ -136,7 +192,11 @@ pytest src/api/tests/test_zorro.py -q
 Generated with partest. Do not commit secrets.
 """
 
+    # `pythonpath = .` puts the project root on sys.path before plugins load. The partest
+    # plugin reads `confpartest` once, at import; without the root on the path a bare `pytest`
+    # finds no `confpartest` and the coverage report counts nothing.
     files["pytest.ini"] = """[pytest]
+pythonpath = .
 log_cli = 1
 log_cli_level = INFO
 log_cli_format = %(message)s
@@ -180,7 +240,7 @@ Faker>=13.12.0
 """
 
     files["requirements/api.txt"] = """-r base.txt
-partest>=2.0.0
+partest>=2.1.0
 pytest>=9.0.3
 pytest-asyncio>=1.3.0
 allure-pytest>=2.13.3
@@ -189,7 +249,7 @@ requests>=2.33.0
 """
 
     files["requirements/ui.txt"] = """-r base.txt
-partest[ui]>=2.0.0
+partest[ui]>=2.1.0
 pytest>=9.0.3
 pytest-playwright>=0.7.2
 allure-pytest>=2.13.3
@@ -215,7 +275,7 @@ KEYCLOAK_CLIENT_ID=
     files["confpartest.py"] = f'''"""partest OpenAPI coverage config (project-local)."""
 
 swagger_files = {{
-    "{safe_name}": ["local", "{openapi_conf}"],
+    {json.dumps(safe_name, ensure_ascii=False)}: ["local", {json.dumps(openapi_conf, ensure_ascii=False)}],
 }}
 
 # TLS. partest verifies certificates by default, and the clients in
@@ -406,9 +466,9 @@ class CollectionsManager(_LibManager):
         super().__init__()
 '''
 
-    files["src/api/resources/security/risk_profiles.py"] = '''"""Entity risk profiles — fill from product knowledge.
+    files["src/api/resources/security/risk_profiles.py"] = '''"""Entity risk profiles — fill from product knowledge."""
 
-from partest.security import RiskProfile
+from partest.security import RiskProfile  # noqa: F401
 
 # PROFILES = {
 #     "health": RiskProfile("health", writes=False, authz=False),
@@ -577,48 +637,4 @@ async def test_health_default(api_client):
                 "    ui_visual: visual baseline compare\n",
             )
 
-    for rel, content in files.items():
-        _write(root, rel, content, force=force, result=result)
-
-    # IR dump for G1 inspectability
-    if suite_ir is not None:
-        ir_path = root / ".partest" / "suite_ir.json"
-        ir_path.parent.mkdir(parents=True, exist_ok=True)
-        if force or not ir_path.exists():
-            ir_path.write_text(
-                json.dumps(suite_ir.to_dict(), ensure_ascii=False, indent=2),
-                encoding="utf-8",
-            )
-            result.created.append(".partest/suite_ir.json")
-        else:
-            result.skipped.append(".partest/suite_ir.json")
-
-        summary = root / ".partest" / "openapi_summary.md"
-        lines = [
-            f"# OpenAPI IR summary — {suite_ir.title}",
-            "",
-            f"- version: `{suite_ir.version}`",
-            f"- openapi: `{suite_ir.openapi_version}`",
-            f"- source: `{suite_ir.source}`",
-            f"- operations: **{len(suite_ir.operations)}**",
-            f"- tags: {', '.join(suite_ir.tags()) or '—'}",
-            "",
-            "| Method | Path | Tag | Subtype | P1 TC |",
-            "|--------|------|-----|---------|-------|",
-        ]
-        for op in suite_ir.operations:
-            p1 = ", ".join(op.required_p1) if op.required_p1 else "—"
-            lines.append(
-                f"| {op.method} | `{op.path}` | {op.tag} | `{op.subtype}` | {p1} |"
-            )
-        lines.append("")
-        lines.append("Entity tests generation: **G3+** (`partest-gen from-openapi --depth p1`).")
-        lines.append("")
-        text = "\n".join(lines)
-        if force or not summary.exists():
-            summary.write_text(text, encoding="utf-8")
-            result.created.append(".partest/openapi_summary.md")
-        else:
-            result.skipped.append(".partest/openapi_summary.md")
-
-    return result
+    return files
