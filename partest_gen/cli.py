@@ -30,6 +30,157 @@ def _resolve_openapi(args: argparse.Namespace) -> Optional[str]:
     return None
 
 
+def _shown_source(source: str) -> str:
+    """*source* as a message may show it: a URL without credentials, query or fragment."""
+    from partest_gen._text import redact_source
+
+    return visible(redact_source(source))
+
+
+def _yaml_problem(exc: BaseException) -> str:
+    mark = getattr(exc, "problem_mark", None)
+    what = getattr(exc, "problem", None) or (str(exc).splitlines() or [type(exc).__name__])[0]
+    if mark is not None:
+        return f"{what} (line {mark.line + 1}, column {mark.column + 1})"
+    return str(what)
+
+
+def _causes(exc: BaseException) -> List[BaseException]:
+    """*exc* and what it wraps: ``__cause__``, ``__context__``, urllib3's ``reason`` and
+    exceptions passed as arguments — requests and urllib3 use all four."""
+    out: List[BaseException] = []
+    seen = set()
+    queue: List[object] = [exc]
+    while queue:
+        cur = queue.pop(0)
+        if not isinstance(cur, BaseException) or id(cur) in seen:
+            continue
+        seen.add(id(cur))
+        out.append(cur)
+        queue.extend([getattr(cur, "reason", None), cur.__cause__, cur.__context__])
+        queue.extend(cur.args)
+    return out
+
+
+#: Where a failed download comes from. urllib3 raises some of its own through requests
+#: unwrapped (``LocationParseError`` for an empty or overlong host label).
+_FETCH_MODULES = ("requests", "urllib3")
+
+
+def _fetch_problem(exc: BaseException, file_hint: str) -> str:
+    """Why a ``--url`` download failed, by class names only: requests puts the full URL —
+    credentials and query string included — into its messages."""
+    import ssl
+
+    chain = _causes(exc)
+    rejected = next((e for e in chain if isinstance(e, ssl.SSLCertVerificationError)), None)
+    if rejected is not None:
+        # verify_message is OpenSSL's reason ("self-signed certificate", "Hostname mismatch,
+        # certificate is not valid for 'host'"): it names at most the host, never the URL
+        why = getattr(rejected, "verify_message", None)
+        return (
+            f"TLS certificate verification failed{f' ({visible(why)})' if why else ''}. "
+            "Trust your CA with REQUESTS_CA_BUNDLE=/path/to/ca.pem, or download the "
+            f"specification and pass it with {file_hint}. PARTEST_TLS_VERIFY does not apply "
+            "to this download"
+        )
+    import requests
+
+    response = getattr(exc, "response", None)
+    if isinstance(exc, requests.HTTPError) and response is not None:
+        return f"HTTP {response.status_code} — download it and pass it with {file_hint}"
+    cause = next(
+        (
+            e
+            for e in chain[1:]
+            # the wrappers say nothing: requests' own classes, urllib3's retry and protocol
+            if not (
+                type(e).__module__.split(".")[0] == "requests"
+                or type(e).__name__ in {"MaxRetryError", "ProtocolError"}
+            )
+        ),
+        None,
+    )
+    reason = type(exc).__name__ if cause is None else f"{type(exc).__name__} ({type(cause).__name__})"
+    if response is not None:
+        # the server answered (a redirect loop, say): the file can still be fetched by hand
+        reason += f" — download it and pass it with {file_hint}"
+    return reason
+
+
+def _spec_read_problem(exc: BaseException, source: str, *, file_hint: str) -> Optional[str]:
+    """One line on why *source* could not be read as a document, or ``None`` when *exc* is
+    not about the input at all — then the caller re-raises it."""
+    import yaml
+
+    from partest_gen.openapi_load import SpecReadError
+
+    shown = _shown_source(source)
+    if isinstance(exc, FileNotFoundError):
+        if Path(source).is_dir():
+            return f"error: OpenAPI specification {shown} is a directory, not a file"
+        return f"error: OpenAPI specification not found: {shown}"
+    if isinstance(exc, UnicodeDecodeError):  # a local file; a download is a SpecReadError
+        if bytes(exc.object[:2]) in (b"\xff\xfe", b"\xfe\xff"):
+            return (
+                f"error: cannot read OpenAPI specification {shown}: it is UTF-16 text "
+                "— re-save it as UTF-8"
+            )
+        return (
+            f"error: cannot read OpenAPI specification {shown}: not UTF-8 text "
+            f"(byte 0x{exc.object[exc.start]:02x} at offset {exc.start})"
+        )
+    if isinstance(exc, json.JSONDecodeError):
+        # A YAML file that failed falls back to JSON; the YAML error is the one that
+        # describes the file. json's own StopIteration sits between the two.
+        context = exc.__context__
+        while context is not None and not isinstance(context, yaml.YAMLError):
+            context = context.__context__
+        if context is not None:
+            return f"error: {shown} is not valid YAML: {_yaml_problem(context)}"
+        return f"error: {shown} is not valid JSON: {exc.msg} (line {exc.lineno}, column {exc.colno})"
+    if isinstance(exc, yaml.YAMLError):
+        return f"error: {shown} is not valid YAML: {_yaml_problem(exc)}"
+    if type(exc).__module__.split(".")[0] in _FETCH_MODULES:
+        return f"error: cannot fetch OpenAPI specification {shown}: {_fetch_problem(exc, file_hint)}"
+    if isinstance(exc, OSError):
+        return f"error: cannot read OpenAPI specification {shown}: {exc.strerror or type(exc).__name__}"
+    if isinstance(exc, SpecReadError):
+        advice = f" — download it and pass it with {file_hint}" if exc.downloaded else ""
+        where = {
+            "fetch": f"cannot fetch OpenAPI specification {shown}",
+            "read": f"cannot read OpenAPI specification {shown}",
+        }.get(exc.stage, f"{shown} is not an OpenAPI document")
+        return f"error: {where}: {visible(exc)}{advice}"
+    return None
+
+
+def _load_spec(source: str, *, file_hint: str):
+    """The specification as ``SuiteIR``, or ``None`` after one line on stderr.
+
+    Reading failures arrive as their own types (see :class:`~partest_gen.openapi_load.
+    SpecReadError`) and become a line: the input is the user's, and a traceback says nothing
+    a line cannot. Anything else — an exception while building the IR above all — is a
+    generator bug and propagates. *file_hint* is how this command takes a local file, for the
+    advice after a failed download.
+    """
+    from partest_gen.openapi_load import load_openapi
+
+    try:
+        return load_openapi(source)
+    except Exception as exc:
+        problem = _spec_read_problem(exc, source, file_hint=file_hint)
+        if problem is None:
+            raise
+        print(problem, file=sys.stderr)
+        return None
+
+
+def _file_hint(args: argparse.Namespace) -> str:
+    """How ``init`` / ``from-openapi`` take a local specification."""
+    return "--file <path>" if args.command == "from-openapi" else "--openapi <path>"
+
+
 def _print_result(result, *, verbose: bool) -> None:
     print(f"Project root: {result.root}")
     print(f"Created/updated: {len(result.created)}  Skipped: {len(result.skipped)}")
@@ -85,7 +236,9 @@ def _copy_spec(root: Path, openapi: str, *, when, refused: List[str]) -> bool:
     link. Returns whether it was written."""
     from partest_gen._fsguard import safe_target
 
-    if str(openapi).startswith("http"):
+    from partest_gen.openapi_load import _is_url
+
+    if _is_url(str(openapi)):
         return False
     src = Path(openapi)
     if not src.is_file():
@@ -160,9 +313,12 @@ def _cmd_init(args: argparse.Namespace) -> int:
     openapi = _resolve_openapi(args)
 
     if openapi:
-        from partest_gen.openapi_load import load_openapi
-
-        suite_ir = load_openapi(openapi)
+        suite_ir = _load_spec(openapi, file_hint=_file_hint(args))
+        if suite_ir is None:
+            return 2
+        if getattr(args, "banner", None):
+            # from-openapi announces itself only once the specification has been read
+            print(args.banner)
         print(
             f"Loaded OpenAPI: {visible(suite_ir.title)} "
             f"({len(suite_ir.operations)} ops, tags={suite_ir.tags()})"
@@ -226,9 +382,9 @@ def _cmd_init(args: argparse.Namespace) -> int:
 
 
 def _cmd_dump_ir(args: argparse.Namespace) -> int:
-    from partest_gen.openapi_load import load_openapi
-
-    ir = load_openapi(args.openapi)
+    ir = _load_spec(args.openapi, file_hint="its path instead of the URL")
+    if ir is None:
+        return 2
     out = Path(args.out) if args.out else None
     payload = ir.to_dict()
     text = json.dumps(payload, ensure_ascii=False, indent=2)
@@ -252,7 +408,7 @@ def _cmd_from_openapi(args: argparse.Namespace) -> int:
     if not getattr(args, "name", None):
         args.name = Path(args.path).name or "api-suite"
     depth = getattr(args, "depth", None) or "default"
-    print(f"from-openapi: skeleton + IR + resources (depth={depth})")
+    args.banner = f"from-openapi: skeleton + IR + resources (depth={depth})"
     return _cmd_init(args)
 
 
@@ -297,7 +453,6 @@ def _cmd_init_package_exports(args: argparse.Namespace) -> int:
 def _cmd_sync_openapi(args: argparse.Namespace) -> int:
     """Refresh paths/collections/IR for an existing project (no full re-init)."""
     from partest_gen.emitters.resources import emit_resources, find_orphans, remove_orphans
-    from partest_gen.openapi_load import load_openapi
 
     openapi = _resolve_openapi(args)
     root = Path(args.path).resolve()
@@ -317,7 +472,9 @@ def _cmd_sync_openapi(args: argparse.Namespace) -> int:
         print(f"error: project path not found: {root}", file=sys.stderr)
         return 2
 
-    suite = load_openapi(openapi)
+    suite = _load_spec(openapi, file_hint="--file <path>")
+    if suite is None:
+        return 2
     print(
         f"Sync OpenAPI: {visible(suite.title)} ({len(suite.operations)} ops) → {root}"
     )
@@ -538,7 +695,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_init_pkg.add_argument(
         "directory",
-        help="Package root to scan (e.g. src/api/resources)",
+        help=(
+            "Root of a package you wrote by hand (e.g. your own helpers package). The "
+            "__init__.py of every directory under it that holds modules is rewritten whole, "
+            "recursively — commit first. Never a directory the generator writes, such as "
+            "src/api/resources: sync-openapi then keeps those files as yours and stops "
+            "refreshing them"
+        ),
     )
     p_init_pkg.add_argument(
         "--no-recursive",

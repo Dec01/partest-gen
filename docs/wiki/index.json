@@ -6,7 +6,7 @@
       "path": "docs/wiki/components/generator.md",
       "title": "partest-gen — parts of the generator",
       "status": "current",
-      "verified": "2026-10-18",
+      "verified": "2026-10-19",
       "audience": "agent",
       "ships_in_wheel": true,
       "sources": [
@@ -17,7 +17,9 @@
         "partest_gen/emitters/resources.py",
         "partest_gen/_fsguard.py",
         "partest_gen/emitters/paths.py",
-        "partest_gen/emitters/schema_py.py"
+        "partest_gen/emitters/schema_py.py",
+        "partest_gen/_text.py",
+        "partest_gen/emitters/tests_default.py"
       ],
       "headings": [
         {
@@ -66,7 +68,19 @@
         },
         {
           "level": 1,
-          "text": "regenerate package __init__ re-exports under a resources tree"
+          "text": "star re-exports in the __init__.py files of a package you wrote by hand"
+        },
+        {
+          "level": 1,
+          "text": "delete every __init__.py under src/api/resources whose first line is that banner, then"
+        },
+        {
+          "level": 1,
+          "text": "sync with the --depth the project was generated with: it writes the generator's own"
+        },
+        {
+          "level": 1,
+          "text": "and the skeleton's (resources/, rbac/, security/): init writes only what is missing"
         },
         {
           "level": 2,
@@ -85,7 +99,7 @@
           "text": "7. Limits worth knowing"
         }
       ],
-      "chars": 8617
+      "chars": 14509
     },
     {
       "slug": "components/ui-layer",
@@ -121,7 +135,7 @@
           "text": "Baselines"
         }
       ],
-      "chars": 3924
+      "chars": 5388
     },
     {
       "slug": "concepts/generated-contract",
@@ -708,16 +722,24 @@
         {
           "level": 2,
           "text": "2026-10-18 · release"
+        },
+        {
+          "level": 2,
+          "text": "2026-10-18 · патч-кандидат после ревью предыдущего выпуска"
+        },
+        {
+          "level": 2,
+          "text": "2026-10-19 · ревью патч-кандидата, четвёртый заход"
         }
       ],
-      "chars": 6389
+      "chars": 7483
     },
     {
       "slug": "proposals",
       "path": "docs/wiki/proposals.md",
       "title": "Предложения, ждущие решения",
       "status": "current",
-      "verified": "2026-10-18",
+      "verified": "2026-10-19",
       "audience": "maintainer",
       "ships_in_wheel": false,
       "sources": [],
@@ -773,16 +795,52 @@
         {
           "level": 3,
           "text": "(E) Подсказка про старый чек-лист — только при `--depth p1`"
+        },
+        {
+          "level": 2,
+          "text": "2026-10-18 · ревью 1.2.1"
+        },
+        {
+          "level": 3,
+          "text": "(1) Браузер падает на сертификате голым `net::ERR_CERT_*`"
+        },
+        {
+          "level": 3,
+          "text": "(2) Нет переключателя TLS только для UI"
+        },
+        {
+          "level": 3,
+          "text": "(3) Код 2 и для неверного ввода, и для сетевого сбоя `--url`"
+        },
+        {
+          "level": 3,
+          "text": "(4) `--url` генератора мог бы читать `PARTEST_TLS_VERIFY`"
+        },
+        {
+          "level": 3,
+          "text": "(5) `init-package-exports` отказывается работать внутри дерева генератора"
+        },
+        {
+          "level": 3,
+          "text": "(6) 2026-10-19 · BOM важнее объявленного charset"
+        },
+        {
+          "level": 3,
+          "text": "(7) 2026-10-19 · библиотечный `load_openapi(url)` отдаёт сырые исключения сети"
+        },
+        {
+          "level": 3,
+          "text": "(8) 2026-10-19 · единая публичная очистка URL в partest"
         }
       ],
-      "chars": 7029
+      "chars": 13328
     },
     {
       "slug": "status",
       "path": "docs/wiki/status.md",
       "title": "Статус, версии и что дальше",
       "status": "current",
-      "verified": "2026-10-18",
+      "verified": "2026-10-19",
       "audience": "maintainer",
       "ships_in_wheel": false,
       "sources": [
@@ -819,7 +877,7 @@
           "text": "4. Как обновлять эту страницу"
         }
       ],
-      "chars": 4127
+      "chars": 4635
     },
     {
       "slug": "WIKI",
@@ -891,6 +949,9 @@
     "partest_gen/_fsguard.py": [
       "components/generator"
     ],
+    "partest_gen/_text.py": [
+      "components/generator"
+    ],
     "partest_gen/cli.py": [
       "components/generator",
       "concepts/generated-contract",
@@ -919,6 +980,7 @@
       "components/generator"
     ],
     "partest_gen/emitters/tests_default.py": [
+      "components/generator",
       "howto/after-generation"
     ],
     "partest_gen/emitters/tests_p1.py": [

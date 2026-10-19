@@ -99,4 +99,9 @@ talks to the API with a plain client.
 
 - The classifier is heuristic: check subtypes on unusual paths before trusting the stub set.
 - `sync-openapi` only refreshes banner files — restructured hand-written tests are your problem.
+- `init-package-exports` is for hand-written packages (your own helpers), never `src/api/resources`
+  or another generated directory: it rewrites the generator's `__init__.py` files, and sync then
+  keeps them as the user's and stops refreshing them.
+- The browser checks TLS certificates by default (`src/ui/conftest.py`); only
+  `PARTEST_TLS_VERIFY=0` turns that off. Do not hardcode `"ignore_https_errors": True`.
 - Generated payloads are shape-correct, not domain-correct: required business values are yours.

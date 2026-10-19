@@ -17,7 +17,7 @@ playwright install chromium
 
 | Path | What it is |
 |---|---|
-| `src/ui/conftest.py` | browser and page fixtures, frontend URL resolution |
+| `src/ui/conftest.py` | browser and page fixtures, frontend URL resolution, certificate checking |
 | `src/ui/pages/` | `BasePage` subclass plus a login page stub |
 | `src/ui/components/` | shared page fragments (app shell, navigation) |
 | `src/ui/fixtures/` | auth fixture and an API seeding fixture |
@@ -41,12 +41,13 @@ network access to fetch a specification it never uses, and fails for reasons tha
 to do with the browser. The generator emits the two trees already separated; keeping them
 separated is yours.
 
-What the generated conftest cannot hold on its own: `partest` imports its coverage module, and
-tries `confpartest` with it, as soon as the harness is imported — by its pytest plugin, before
-any conftest. A UI run from the project root has always made that attempt. Without the root
-on `sys.path` it found nothing and loaded no specification; with `pythonpath = .` in the
-generated `pytest.ini`, as with `python -m pytest`, it loads the one `confpartest` names. The
-cause is on the `partest` side; the generated UI tree itself imports neither.
+What the generated conftest cannot hold on its own: the `partest` pytest plugin runs before
+any conftest, and with the project root on `sys.path` (`pythonpath = .` in the generated
+`pytest.ini`, or `python -m pytest`) it imports `confpartest` to read its own switches — in a
+UI-only run too. Older `partest` releases also loaded the specification it names at that
+moment; current ones read it only on first use, the first tracked API call or a coverage
+report, and a UI run makes neither. The cause is on the `partest` side; the generated UI tree
+itself imports neither.
 
 Seeding data for a UI test is the one place the temptation appears. Do it through
 `fixtures/api_seed.py`, which talks to the API with a plain client — no coverage session, no
@@ -57,6 +58,29 @@ Its one concession to the harness is TLS: the seed client asks
 `verify=False` in a generated file is how a project ends up unverified without ever deciding to
 be. `env_only` keeps the isolation rule: `PARTEST_TLS_VERIFY` is read, `confpartest` is not, so
 `tls_verify = False` in the project file deliberately does **not** reach a UI job.
+
+The browser follows the same switch. `browser_context_args` in `src/ui/conftest.py` sets
+`ignore_https_errors` from `partest.ui.ignore_https_errors()`, which reads the environment
+only:
+
+| `PARTEST_TLS_VERIFY` | Browser |
+|---|---|
+| unset, `1`, `true` | checks certificates — the default |
+| `0`, `false` | accepts any certificate; partest warns once (`TLSVerificationDisabled`) |
+| a CA bundle path | still checks, against the browser's own trust store; partest says the bundle was not applied |
+
+The message for a CA bundle is a plain `UserWarning`, not `TLSVerificationDisabled`, and it is
+worded for baseline capture: it suggests passing `ignore_https_errors=True`. For the generated
+conftest that is not the fix — it is the switched-off check this page is about. A Playwright
+context has no CA bundle option, only on/off, so a private CA has to go where the browser
+looks: the OS trust store for Chromium on Windows and macOS, the NSS database
+(`~/.pki/nssdb`, `certutil`) for Chromium on Linux. Firefox and WebKit do not read
+`~/.pki/nssdb`; each trusts a store of its own.
+
+Projects generated before this rule set `"ignore_https_errors": True` in that file. It carries
+no banner, so nothing rewrites it on its own: either change the line by hand — `CHANGELOG.md`
+has the exact replacement — or delete `src/ui/conftest.py` and run `init-ui` without
+`--force`, which writes only the files that are missing.
 
 ## What stays a stub forever
 

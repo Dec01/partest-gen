@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections import defaultdict
 from typing import Dict, List, Optional, Sequence, Set, Tuple
 
@@ -98,16 +99,39 @@ def build_default_test_module(
     return "\n".join(lines)
 
 
+def _path_template(path: str) -> str:
+    """*path* with every parameter name dropped: ``/items/{id}`` and ``/items/{item_id}``
+    are one endpoint to the server, whatever the specification calls the parameter."""
+    return re.sub(r"\{[^}]*\}", "{}", path)
+
+
 def build_not_allowed_test_module(
     tag: str,
     ops: List[OpIR],
     path_attrs: Dict[str, str],
+    *,
+    declared: Optional[Dict[str, Set[str]]] = None,
 ) -> str:
+    """405 probes for the paths of *ops* — the tag's live operations.
+
+    *declared* maps a path template (:func:`_path_template`) to every method the
+    specification declares on it: under any tag, deprecated or not, whatever ``--entities``
+    selected. The server answers all of those, so none of them may be probed for 405.
+    Without it, *ops* alone are taken as the declaration. A path whose operations are all
+    deprecated is not in *ops* and gets no probe.
+    """
     tag_s = is_snake(tag)
+    if declared is None:
+        declared = defaultdict(set)
+        for op in ops:
+            declared[_path_template(op.path)].add(op.method.upper())
     by_path: Dict[str, Set[str]] = defaultdict(set)
     for op in ops:
-        if not op.deprecated:
-            by_path[op.path].add(op.method.upper())
+        if op.deprecated:
+            continue
+        by_path[op.path].add(op.method.upper())
+    for path in by_path:
+        by_path[path] |= declared.get(_path_template(path), set())
 
     lines: List[str] = [
         GENERATED_BANNER,
@@ -182,7 +206,11 @@ def build_test_files(
 ) -> Dict[str, str]:
     allow = {is_snake(t) for t in tags_filter} if tags_filter else None
     by_tag: Dict[str, List[OpIR]] = defaultdict(list)
+    # what NotAllowed must not probe: every method of a path in the whole specification —
+    # all tags, deprecated operations included, regardless of the filter
+    declared: Dict[str, Set[str]] = defaultdict(set)
     for op in suite.operations:
+        declared[_path_template(op.path)].add(op.method.upper())
         if op.deprecated:
             continue
         tag = is_snake(op.tag)
@@ -201,6 +229,6 @@ def build_test_files(
             tag, ops, path_attrs
         )
         files[f"src/api/tests/{tag}/test_{tag}_not_allowed.py"] = (
-            build_not_allowed_test_module(tag, ops, path_attrs)
+            build_not_allowed_test_module(tag, ops, path_attrs, declared=declared)
         )
     return files

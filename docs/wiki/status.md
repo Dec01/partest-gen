@@ -1,7 +1,7 @@
 ---
 title: Статус, версии и что дальше
 status: current
-verified: 2026-10-18
+verified: 2026-10-19
 sources: [partest_gen/__init__.py, CHANGELOG.md]
 audience: maintainer
 ships_in_wheel: false
@@ -15,8 +15,8 @@ allow_version_literals: true
 
 | | |
 |---|---|
-| **Дата актуализации** | 2026-10-18 |
-| **Текущая версия** | **1.2.0** — выпуск 2026-10-18 (1.1.0, 1.0.1, 1.0.0 — 2026-09-23): первый `from-openapi` без `--force`, распознавание заготовок скелета, обновляемый `P1_CHECKLIST.md`, `pythonpath` в `pytest.ini`, засеваемый пол `partest`, `--entities` без потери общих модулей, `sync-openapi --prune`, экранирование текста спецификации, отказ писать через ссылки. Спорное — [[proposals]] |
+| **Дата актуализации** | 2026-10-19 |
+| **Текущая версия** | **1.2.1** — кандидат 2026-10-19: браузер UI-дерева проверяет сертификаты по умолчанию (`PARTEST_TLS_VERIFY=0` выключает), нечитаемая спецификация — одна строка и код 2, URL спецификации без учётных данных, query и fragment в `.partest/` и в выводе, 405-пробы только на методы, которых путь не объявляет ни в одном теге (устаревшие тоже считаются), правдивый TLS-комментарий `confpartest.py`, `init-package-exports` не советуется для генерируемого дерева. **1.2.0** — выпуск 2026-10-18 (1.1.0, 1.0.1, 1.0.0 — 2026-09-23): первый `from-openapi` без `--force`, распознавание заготовок скелета, обновляемый `P1_CHECKLIST.md`, `pythonpath` в `pytest.ini`, засеваемый пол `partest`, `--entities` без потери общих модулей, `sync-openapi --prune`, экранирование текста спецификации, отказ писать через ссылки. Спорное — [[proposals]] |
 | **Происхождение** | извлечён из `partest` (`partest.project_gen`), история каталога перенесена целиком |
 | **Зависимость** | `partest>=2.1.0`, минимальный Python — 3.10 |
 | **Порядок выпуска** | нижняя граница должна быть на PyPI раньше нас; `partest` 2.1.0 там есть |
@@ -70,7 +70,7 @@ allow_version_literals: true
 | | |
 |---|---|
 | Минимум | `partest>=2.1.0`. Пути `api/` и `ui/` методики появились в 2.0.0; 2.1.0 — потому что 2.0.x объявляют уязвимые нижние границы своих зависимостей. Тот же пол засевается в `requirements/{api,ui}.txt` проекта |
-| Что берётся | `partest.methodology.api.{classifier,matrix,subtypes}`, `partest.test_types`, `partest.tools.generate_init`, `partest.tls` (в UI-шаблоне) |
+| Что берётся | `partest.methodology.api.{classifier,matrix,subtypes}`, `partest.test_types`, `partest.tools.generate_init`, `partest.tls` и `partest.ui.ignore_https_errors` (в UI-шаблоне; оба есть с 2.0.0) |
 | Что эмитится | только публичный `partest.*` — см. [[decisions/methodology-upstream]] |
 
 `partest` со своей стороны держит `partest.project_gen` как мост на этот пакет и экстру

@@ -6,6 +6,166 @@ code generator: the **names and locations of the files it writes** are part of t
 Renaming a generated module breaks hand-written imports in every project that ran the previous
 version, so it is a major change even though no exported name moved.
 
+## 1.2.1 — 2026-10-19
+
+### Fixed
+
+- **The generated UI tree switched certificate checking off in the browser.**
+  `src/ui/conftest.py` set `"ignore_https_errors": True` in `browser_context_args`, so every
+  page of a UI run accepted any certificate — the browser half of the default that 1.0.0
+  removed from the HTTP clients, and nowhere documented. The browser now checks certificates by
+  default. The switch is the one the UI seed client already uses, read from the environment
+  only (the UI tree does not load `confpartest`): `PARTEST_TLS_VERIFY=0` turns the check off
+  for the run and partest warns once per process (`TLSVerificationDisabled`, on the 2.1.0
+  floor as well); `tls_verify` in
+  `confpartest.py` does not reach the browser. The value comes from the public
+  `partest.ui.ignore_https_errors()`, available from the `partest` floor this package already
+  requires.
+
+  A CA bundle path in `PARTEST_TLS_VERIFY` cannot be given to a browser — a Playwright
+  context has only on/off — so the check stays on. partest then emits a plain `UserWarning`
+  (not `TLSVerificationDisabled`, so a filter on that category does not catch it) worded for
+  baseline capture; its advice to pass `ignore_https_errors=True` is not the fix for the
+  generated conftest. Install the CA where the browser looks instead: the OS trust store for
+  Chromium on Windows and macOS, the NSS database (`~/.pki/nssdb`) for Chromium on Linux. The
+  generated comment, `src/ui/README.md`, `docs/UI_GUIDE.md` and a commented
+  `# PARTEST_TLS_VERIFY=` line in `env.example` say so. The unused `import os` is gone from
+  the generated conftest.
+
+  **Existing projects keep the old line.** `src/ui/conftest.py` carries no banner, so neither
+  `sync-openapi` nor `init-ui` rewrites it (`init-ui --force` would, together with every
+  other UI file you edited). Either delete `src/ui/conftest.py` and run `init-ui` without
+  `--force` — it writes only the files that are missing, so if you edited the conftest, carry
+  your changes over — or change it by hand: add the import and replace the line:
+
+  ```python
+  from partest.ui import ignore_https_errors          # next to the other partest.ui import
+
+          "ignore_https_errors": True,                # remove this line …
+          "ignore_https_errors": ignore_https_errors(),  # … and write this one
+  ```
+
+  A UI run against a frontend with a self-signed certificate then fails until you install
+  its CA in the browser's trust store or set `PARTEST_TLS_VERIFY=0` for that run.
+
+- **A specification that could not be read ended in a traceback with exit code 1.**
+  `from-openapi`, `sync-openapi`, `dump-ir` and `init --openapi` now print one line to
+  stderr — which file, and what is wrong with it — and exit with code 2, before anything is
+  written (`from-openapi` no longer announces itself before the specification is read): the
+  file does not exist or is a directory; it cannot be read (permissions, not UTF-8 — a
+  UTF-16 file is named, with "re-save it as UTF-8"; a downloaded body gets its own message,
+  below); it is not valid YAML or JSON (with the line and
+  column); its top level is not a mapping, or `info` or `paths` holds a value that is not a
+  mapping (an empty one — `[]`, `""`, `0` — reads as absent, as before); or the URL cannot be
+  used. For a URL the line gives the HTTP status with the advice to download the file and
+  pass it as a file; names an HTML or XML page (a login or error page) served instead of a
+  specification, and credentials in the URL that are not Latin-1 (requests cannot send them;
+  its own error quoted the character); for a rejected certificate, gives OpenSSL's reason (self-signed, expired,
+  hostname mismatch) and the ways out — `REQUESTS_CA_BUNDLE=/path/to/ca.pem`, or the file
+  (`PARTEST_TLS_VERIFY` does not apply to the generator's download); and otherwise names the
+  class of the failure and of its cause, from `requests` or `urllib3`
+  (`ConnectionError (NameResolutionError)`, `LocationParseError`), never the text of the
+  exception. An exception while building the model of a readable specification is still
+  raised as it is: that is a generator bug. A document without an `openapi`/`swagger` field
+  is read as before. For a shape it cannot build from, a body it cannot decode and
+  credentials it cannot send, `load_openapi()` raises `SpecReadError` — a `ValueError`
+  subclass, so `except ValueError` keeps catching it, as it caught the non-mapping case
+  before; its `downloaded` attribute is true for a URL source, and `stage` says where it
+  failed — `fetch` (credentials it cannot send), `read` (a body it cannot decode) or `shape`
+  (not a specification). Other failures keep their own
+  exception types, and the message of a missing file shows the source cleaned as below.
+
+- **`HTTP://…` was looked for as a local file.** The scheme is recognised in any case and
+  with whitespace around the source; such a source is now downloaded where it used to end in
+  "not found". A source without `://` — a mistyped scheme such as `http:/host/x.yaml`
+  included — is a path, and is printed as it is.
+
+- **A downloaded specification was decoded as ISO-8859-1** when the server sent `text/*`
+  without a charset: a BOM and every non-ASCII character in it were garbled. A `charset=` the
+  `Content-Type` declares is now honoured, and a response without one is decoded as UTF-8
+  (a BOM accepted). A body that cannot be decoded is one line with code 2 and the advice to
+  download the file: UTF-16 the `Content-Type` does not announce ("does not say so", also
+  under `charset=utf-8`), bytes outside the declared charset (named, with the offset), a
+  charset Python does not know or cannot decode with (`undefined`, `idna`; the value is
+  quoted, cut to 40 characters). An HTML or XML page is recognised by its body, not its
+  `Content-Type`: a specification served as `text/html` is read, a login page served as
+  `text/plain` — or an XML error from object storage — is refused with the same advice. So
+  is a downloaded body that is empty or not a mapping (an SSO answering 200 with
+  `Unauthorized`). Only an HTTP error status is reported as
+  `HTTP <code>`; another failure after the server answered (`TooManyRedirects`) is named by
+  its class, with the same advice.
+
+- **A local specification named like `http-api.yaml` was not copied to `docs/openapi.yaml`**:
+  any source starting with `http` was taken for a URL. Only `http://` and `https://` are.
+
+- **A UTF-8 byte order mark broke JSON specifications.** Local documents, and downloaded
+  ones that declare no charset or UTF-8, are decoded as `utf-8-sig`.
+
+- **A specification URL kept its credentials in the generated tree.** The source recorded in
+  `.partest/suite_ir.json` and `.partest/openapi_summary.md`, and printed by `dump-ir`, was
+  the URL as given — `user:password@`, query string and fragment included. It is now stored
+  and shown without them (`https://***@host/path`), and so are the URLs in error messages.
+  The cleaning does not rely on URL parsing, which raised on a malformed URL (an unclosed
+  `[`) and let a password with an unencoded `/` or `?` through. Any string with `://` — any
+  scheme, any case, surrounding whitespace — loses its query string and fragment, and the
+  credentials in its authority (the text up to the first `/`, `?` or `#`, up to its last `@`)
+  become `***@`. An `@` after the authority is ambiguous — a CDN path
+  (`https://cdn.jsdelivr.net/npm/@scope/pkg@1.0.0/openapi.yaml`) or the rest of a password
+  with an unencoded `/`, `?` or `#` (`admin:2024/q@host`, `tok/en@github.com`) — and
+  ambiguity is settled towards hiding: the URL is shown as `<URL not shown>` when the
+  authority carries credentials and another `@` follows anywhere (`u:pa@ss.word/x@h.test` —
+  so `u:p@registry.example/…/npm/@scope/…` is hidden too), when that `@` is there and the host has a
+  `:` (a port included) or is a name without a dot that is not an IPv6 literal, and when the
+  host after a userinfo `@` has a `:` not followed by a number. A dotted host without a port
+  and without credentials keeps its path, so no host is invented. The cleaning never
+  raises; a failure inside it shows `<URL not shown>`. A token inside the path itself cannot
+  be told apart and stays. Trees generated earlier from such a URL: the next `sync-openapi` rewrites both
+  `.partest` files; check your history for the old ones.
+
+- **A method the specification declares was probed for 405.** `test_<tag>_not_allowed.py`
+  picks, for each path, a method the path does not declare — but it counted only the tag's
+  own live operations. A deprecated method (`POST /items` deprecated next to a live
+  `GET /items`) or a method under another tag (`GET /items` tagged `items`, `POST /items`
+  tagged `admin`) produced `test_post_items_not_allowed`, expecting 405 from a method the
+  server answers. What a path declares is now taken from the whole specification — every
+  tag, deprecated operations included, whatever `--entities` selected — and paths are matched
+  by template, so `PUT /items/{id}` and `GET /items/{item_id}` are one endpoint. Probes are still
+  emitted only for paths with a live operation of the tag, so a path whose operations are all
+  deprecated gets none, as in 1.2.0. The file carries the banner: the next `sync-openapi`
+  rewrites it, nothing to do by hand.
+
+- **The `confpartest.py` comment on TLS described an older `partest`.** It said a
+  certificate failure happens during collection "because the specification is loaded while
+  the suite is assembled". The generated specification source is a local file and needs no
+  TLS; a failure against the stand comes from the first test that calls the API, as
+  `httpx.ConnectError` with "partest: TLS certificate verification failed", which names the
+  switches. The comment now says that, and what happens to a `"url"` source from `partest`
+  2.6.0 on: it is fetched on first use, and if that fails the first tracked API call raises
+  `ConfpartestError` naming the source, while the coverage report is built with nothing
+  counted and says why under `partest: coverage NOT COUNTED`. Older releases fetch it when
+  `partest` is imported, during collection. Existing projects own `confpartest.py`; the old
+  comment is wrong, not harmful, and can be left or replaced by the new one from a fresh
+  `init`.
+
+### Documentation
+
+- `init-package-exports` is no longer advertised for `src/api/resources`. Its `--help` and
+  the generator page used that path as the example; run there, it rewrites the generator's
+  `__init__.py` files under a banner of its own, and `sync-openapi` then keeps them as yours
+  and stops refreshing them. Both now say it is for a package you wrote by hand and that it
+  rewrites every `__init__.py` under the directory whole and recursively (commit first); the
+  generator page gives the full recovery: delete the `__init__.py` files under
+  `src/api/resources` whose first line is
+  `# AUTO-GENERATED by partest.tools.generate_init — safe to re-run`, run `sync-openapi`
+  with the `--depth` the project was generated with, then `init` without `--force` for the
+  skeleton's own (`resources/`, `rbac/`, `security/`). A test walks that recipe.
+- The 1.2.0 entry on deprecated operations said they keep their "path constants and facade
+  entries"; only the constants in `paths.py` and the facade's `paths` entries are kept, and it
+  did not say that their methods were probed for 405. Corrected in place.
+- The UI page and the `partest-scaffold` playbook said a certificate failure shows up during
+  collection; with the current `partest` it shows up at the first API call. The generator
+  page describes the exit code 2 for an unreadable specification.
+
 ## 1.2.0 — 2026-10-18
 
 ### Fixed
@@ -62,10 +222,17 @@ version, so it is a major change even though no exported name moved.
   the specification's tags.
 
 - **Deprecating every operation of a tag broke its tests.** `paths.py` dropped the tag's
-  constants while the tests written for it stayed. Deprecated operations now keep their path
-  constants and facade entries: the operation is still in the specification. Live operations
-  are named first, so a deprecated path that maps to the same attribute (`/items/{itemId}`
-  next to `/items/{item_id}`) takes the `_2` name and never the live endpoint's.
+  constants while the tests written for it stayed. Deprecated operations now keep their
+  constants in `paths.py` and their entries in the collection facade's `paths`: the operation
+  is still in the specification. Nothing else is generated for them — no payload builder, no
+  response validator and no tests of their own, so the facade's `payload` and `validate` have
+  no entry for them; such files written before the operation was deprecated stay and are not
+  orphans. One thing did aim at them: the NotAllowed file took a deprecated method for one its
+  path lacks and probed it for 405 — fixed in 1.2.1.
+  Live operations are named first, so a deprecated path that maps to the same attribute
+  (`/items/{itemId}` next to `/items/{item_id}`) takes the `_2` name and never the live
+  endpoint's. *(Corrected after release: this entry first said deprecated operations keep
+  their "path constants and facade entries", which read as every facade entry.)*
 
 - **Text from the specification could run as code.** Paths, `operationId`s, summaries and
   parameter names went into emitted string literals, docstrings and comments unescaped, and

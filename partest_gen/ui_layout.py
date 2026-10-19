@@ -46,6 +46,9 @@ Playwright UI layer — **isolated** from API OpenAPI / partest coverage session
 4. Attach network/console health on failures (`utils/page_monitor.py`).
 5. Visual baselines under `baselines/reference/` (git); actual/diff gitignored.
 6. Do **not** import `confpartest` or load swagger in UI conftest.
+7. TLS: the browser checks certificates. `PARTEST_TLS_VERIFY=0` turns that off for a
+   run (partest warns); a private CA goes into the browser's trust store — a CA bundle
+   path cannot reach a browser. See the comment in `conftest.py`.
 
 ## Install
 
@@ -93,10 +96,9 @@ Uses **sync** pytest-playwright ``page``. Do not import confpartest.
 
 from __future__ import annotations
 
-import os
-
 import pytest
 
+from partest.ui import ignore_https_errors
 from partest.ui.hooks import resolve_frontend_url
 
 
@@ -116,12 +118,24 @@ def frontend_url(request) -> str:
 
 @pytest.fixture(scope="session")
 def browser_context_args(browser_context_args, frontend_url):
-    """pytest-playwright context: locale, viewport, SPA base_url."""
+    """pytest-playwright context: viewport, SPA base_url, certificate checking."""
     return {
         **browser_context_args,
         "viewport": {"width": 1440, "height": 900},
         "base_url": frontend_url,
-        "ignore_https_errors": True,
+        # The browser checks certificates, like every partest client. The switch is the
+        # environment only: PARTEST_TLS_VERIFY=0 turns the check off for this run, and partest
+        # warns once (TLSVerificationDisabled). ``tls_verify`` in confpartest.py does not
+        # reach here — a UI job does not load the API config.
+        #
+        # PARTEST_TLS_VERIFY=/path/to/ca.pem cannot be handed to a browser: a Playwright
+        # context has no CA bundle option, only this on/off. The check stays on and partest
+        # says the bundle was not applied (a UserWarning worded for baseline capture — its
+        # advice to switch the capture check off is not the fix here). To trust your CA,
+        # install it where the browser looks: the OS trust store for Chromium on Windows and
+        # macOS, the NSS database (~/.pki/nssdb, ``certutil``) for Chromium on Linux.
+        # Firefox and WebKit do not read ~/.pki/nssdb; each trusts a store of its own.
+        "ignore_https_errors": ignore_https_errors(),
     }
 
 
@@ -632,6 +646,10 @@ Aligns with monorepo isolation:
 6. Define visual scenes + capture baselines
 7. Utils re-export `partest[ui]` (`BasePage` **sync**, `PageMonitor`, `Storage`)
 8. Optional: `PARTEST_UI_MONITOR=1` for autouse PageMonitor finalize
+9. TLS: the browser checks certificates. For a stand signed by your own CA install the CA
+   in the browser's trust store (OS store for Chromium on Windows/macOS, `~/.pki/nssdb`
+   on Linux); `PARTEST_TLS_VERIFY=0` switches checking off for a run and partest warns.
+   `tls_verify` in `confpartest.py` does not reach the UI suite.
 
 ## Markers
 

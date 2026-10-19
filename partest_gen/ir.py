@@ -10,6 +10,8 @@ from partest.methodology.api.classifier import classify_endpoint
 from partest.methodology.api.matrix import p1_test_cases
 from partest.methodology.api.subtypes import MethodSubtype
 
+from partest_gen._text import redact_source
+
 
 @dataclass
 class ParamIR:
@@ -367,5 +369,7 @@ def build_ir_from_openapi_dict(
         version=version,
         openapi_version=oas,
         operations=ops,
-        source=source,
+        # stored in .partest/suite_ir.json and openapi_summary.md, and printed by dump-ir:
+        # a URL must not carry its credentials or query string there
+        source=redact_source(source) if source else source,
     )

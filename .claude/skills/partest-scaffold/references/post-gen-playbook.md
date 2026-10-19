@@ -46,15 +46,23 @@ Prioritize **impact**: auth / money / PII writes before catalog GETs.
 4. Confirm: `pytest src/api/tests/test_smoke_health.py -q` (or health default) hits the stand.
 
 TLS on the first run: `partest` verifies certificates, and the generated clients inherit that.
-A self-signed or internally signed stand fails with `SSLError` / `ConnectError` **during
-collection**, before any test runs. The answer is already in the project — the commented
+A self-signed or internally signed stand fails at the **first test that calls the API**, with
+`httpx.ConnectError: partest: TLS certificate verification failed for <url>` — the message
+names the switches. (A `"url"` specification source that cannot be fetched makes the first
+tracked call raise `ConfpartestError`, and the coverage report says why under `NOT COUNTED`;
+older `partest` releases fetched it during collection.) The answer is
+already in the project — the commented
 `tls_verify` block in `confpartest.py`; prefer the CA bundle form, which keeps the check.
 `PARTEST_TLS_VERIFY` does the same from the environment and wins over the file. Do **not** put
 `verify=False` back into a fixture: that decision then hides in a file nobody reads twice.
 
 Isolation rule: **UI tests must not import** API swagger session / `confpartest` coverage loaders.
 The UI seed client reads TLS from the environment only (`resolve_verify(..., env_only=True)`), so
-`tls_verify` in `confpartest.py` intentionally does not reach a UI run.
+`tls_verify` in `confpartest.py` intentionally does not reach a UI run. The browser does the same
+through `partest.ui.ignore_https_errors()` in `src/ui/conftest.py`: it checks certificates unless
+`PARTEST_TLS_VERIFY=0`; a CA bundle path cannot reach a browser, so install that CA in the OS /
+NSS trust store instead. Do **not** put `"ignore_https_errors": True` back — trees generated
+before partest-gen 1.2.1 have it; replace it with `ignore_https_errors()`.
 
 ---
 

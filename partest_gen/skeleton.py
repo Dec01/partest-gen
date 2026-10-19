@@ -264,6 +264,11 @@ BASE_URL=http://127.0.0.1:8080
 OPENAPI_URL=
 TEST_DATA_MARKER=AQA
 
+# TLS certificates are checked by every partest client and by the browser of src/ui.
+# A CA bundle keeps the API clients checking (the browser needs that CA in its own trust
+# store); 0 turns checking off for the run and partest warns. Wins over confpartest.py.
+# PARTEST_TLS_VERIFY=
+
 # Optional OIDC (TokenManager)
 KEYCLOAK_URL=
 KEYCLOAK_REALM=
@@ -279,16 +284,23 @@ swagger_files = {{
 }}
 
 # TLS. partest verifies certificates by default, and the clients in
-# src/api/tests/conftest.py inherit that. A stand with a self-signed or internally signed
-# certificate fails with SSLError / ConnectError — during collection, because the
-# specification is loaded while the suite is assembled. One of these lines covers the whole
-# suite; uncomment the one that is true for your stand:
+# src/api/tests/conftest.py inherit that. Against a stand with a self-signed or internally
+# signed certificate the first test that calls the API fails with httpx.ConnectError:
+# "partest: TLS certificate verification failed for <url>", followed by these switches.
+# One of these lines covers the whole suite; uncomment the one that is true for your stand:
 #
 #     tls_verify = "/etc/ssl/corp-ca.pem"   # preferred: keep checking, trust your own CA
 #     tls_verify = False                    # last resort: warns once per process
 #
-# The environment wins over this file: PARTEST_TLS_VERIFY=0 or a bundle path. The same
-# switch also covers fetching the specification, and that host is often a different one.
+# The environment wins over this file: PARTEST_TLS_VERIFY=0 or a bundle path. The browser of
+# src/ui reads only the environment, never this file.
+#
+# The specification above is a "local" file and needs no TLS. A "url" source is fetched with
+# the same switch, and its host is often a different one. partest 2.6.0 and later fetch it on
+# first use: if that fails, the first tracked API call raises ConfpartestError naming the
+# source, and the coverage report is built with nothing counted and gives the reason under
+# "partest: coverage NOT COUNTED". Earlier releases fetched it when partest was imported, so
+# the run failed while tests were being collected.
 
 # Used only when zorro(use_matrix=False)
 test_types_coverage = [

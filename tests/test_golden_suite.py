@@ -6,6 +6,7 @@ CI-friendly: no live stand, no browser. Ensures G1–G5 output stays importable.
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -87,10 +88,17 @@ def test_golden_tree_shape(golden_suite: Path):
     offenders = [
         str(p.relative_to(root))
         for p in root.rglob("*.py")
-        if "verify=False" in p.read_text(encoding="utf-8")
+        if re.search(r"verify=False|[\"']?ignore_https_errors[\"']?\s*[:=]\s*True",
+                     p.read_text(encoding="utf-8"))
     ]
     assert not offenders, f"generated code disables TLS verification: {offenders}"
-    assert "tls_verify" in (root / "confpartest.py").read_text(encoding="utf-8")
+    ui_conftest = (root / "src/ui/conftest.py").read_text(encoding="utf-8")
+    assert '"ignore_https_errors": ignore_https_errors()' in ui_conftest
+    conf = (root / "confpartest.py").read_text(encoding="utf-8")
+    assert "tls_verify" in conf
+    # partest reads the specification on first use, not while the suite is collected
+    assert "while the suite is assembled" not in conf
+    assert "TLS certificate verification failed" in conf
 
     summary = (root / ".partest/openapi_summary.md").read_text(encoding="utf-8")
     assert "items" in summary.lower()
