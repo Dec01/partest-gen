@@ -141,3 +141,36 @@ PyPI все три выпуска выложены 2026-09-23, а `setup.py` в�
   `load_openapi`, (8) единая очистка URL в `partest`.
 - [[components/generator]]: правило скрытия URL с учётными данными и ещё одним `@`;
   `SpecReadError.downloaded` и `stage`; ошибки декодирования скачанного ответа.
+
+## 2026-10-25 · следующий выпуск: каскад нового `partest` и долг прошлого выпуска
+
+- [[components/generator]]: настоящие типы ошибок разбора у `load_openapi()` (локальный
+  файл — `json.JSONDecodeError` с `yaml.YAMLError` в цепочке, скачанный — `yaml.YAMLError`);
+  `dump-ir -o` в незаписываемый путь — одна строка и код 2.
+- [[howto/scaffold]]: `--url` не сохраняет спецификацию в проект; что с этим делать.
+- [[status]]: следующий выпуск, сверка с новым `partest`; `verified:` страниц, чьи `sources`
+  задеты (`skeleton.py`, `cli.py`, `CHANGELOG.md`), сверены по диффу.
+
+## 2026-10-25 · update · обнуление отчёта, `--url`, ошибки разбора
+
+- [[components/generator]]: `Not saved:` после `--url`, атомарная запись `dump-ir`,
+  `ConstructorError` для значения, которое YAML не может построить, `init_skeleton` и вид
+  источника.
+- [[howto/scaffold]], [[howto/resync]]: `--url` не сохраняет спецификацию; `--prune` против
+  заглушки; убран совет переводить `swagger_files` на URL.
+- [[howto/after-generation]]: одна команда для набора и отчёта о покрытии.
+- [[proposals]]: (9) сохранять скачанное, (10) защита sync от другого API, (11) тавтология
+  в `test_zorro.py`.
+- [[decisions/methodology-upstream]], [[howto/release]]: `verified:` поднят после сверки,
+  правок по существу нет.
+
+## 2026-10-25 · последний круг кандидата
+
+- [[components/generator]]: значения, которые тег не может построить; `dump-ir` и одиночный
+  суррогат, кодировка stdout; `Warning:` у голого `sync-openapi` по заглушке; ASCII-литералы
+  в `confpartest.py`.
+- [[howto/after-generation]]: что видит `test_zorro.py`; симптом старого conftest.
+- [[howto/scaffold]]: `Warning:` перед перезаписью по заглушке.
+- [[proposals]]: (12)–(16).
+- [[status]]: следующий выпуск, честно про случай `-n 2` без xdist.
+

@@ -1,7 +1,7 @@
 ---
 title: partest-gen — parts of the generator
 status: current
-verified: 2026-10-19
+verified: 2026-10-25
 sources: [partest_gen/cli.py, partest_gen/ir.py, partest_gen/skeleton.py, partest_gen/openapi_load.py, partest_gen/emitters/resources.py, partest_gen/_fsguard.py, partest_gen/emitters/paths.py, partest_gen/emitters/schema_py.py, partest_gen/_text.py, partest_gen/emitters/tests_default.py]
 audience: agent
 ships_in_wheel: true
@@ -160,6 +160,21 @@ absent), and a `--url` that cannot be used:
 - a body that cannot be decoded — UTF-16 the `Content-Type` does not announce, bytes outside
   the declared charset (named), a charset Python does not know — with the same advice.
 
+An output that cannot be written is reported the same way: `dump-ir -o` to a directory, to a
+path under a file, or where the system refuses the write prints
+`error: cannot write IR to <path>: <reason>` and exits with code 2. The IR is written to a
+temporary file beside the target and moved over it, so a failed write leaves the previous
+file whole and no temporary file behind. A specification with a lone surrogate is refused
+before anything is written, with `-o` or without; an IR that the encoding of stdout cannot
+hold is one line with the advice to use `-o`.
+
+After `init --openapi <URL>`, `from-openapi --url` or `sync-openapi --url`, a line starting with
+`Not saved:` says that the download was not saved in the project while `docs/openapi.yaml`
+is still the skeleton's `/health` placeholder, which the coverage report and a
+`sync-openapi` without a source read. Such a `sync-openapi`, on a project with generated tags
+the placeholder does not declare, prints a `Warning:` line naming them before it rewrites
+`paths.py` — a warning, not a refusal. See [[howto/scaffold]].
+
 A downloaded document is decoded with the `charset=` its `Content-Type` declares, and as UTF-8
 (a byte order mark accepted) when it declares none. A document without
 an `openapi`/`swagger` field is read as before. Any other exception is a generator bug and is
@@ -222,22 +237,39 @@ Exported from `partest_gen.emitters` — the same calls `sync-openapi` makes:
 | `find_orphans(project_root, suite, *, tags_filter=None, links=None) -> list[str]` | generated files no operation produces any more, project-relative. Pass a list as `links` to receive the links it did not enter |
 | `remove_orphans(project_root, orphans, *, failed=None, skipped=None) -> list[str]` | deletes them after checking each again; returns what was deleted, puts paths that failed the re-check into `skipped` and those the system refused into `failed` |
 
+`partest_gen.skeleton.init_skeleton(target, *, name, with_ui, force, openapi_source, suite_ir)`
+writes the skeleton alone. `openapi_source` goes into `confpartest.swagger_files`, the
+source of the coverage report: an `http://` or `https://` address as `"url"`, anything else as
+a `"local"` path, `docs/openapi.yaml` by default. It is written as given, as an ASCII Python
+literal with `\u`/`\U` escapes (the project name too), into a file projects commit — pass an address without credentials and without tokens
+in its query.
+
 `suite` is what `partest_gen.openapi_load.load_openapi(path_or_url)` returns. What it raises
 when it cannot:
 
 - `FileNotFoundError` or `OSError` for a file it cannot open;
-- `ValueError` for a local file it cannot decode (`UnicodeDecodeError`) or JSON it cannot
-  parse (`json.JSONDecodeError`), and `partest_gen.openapi_load.SpecReadError` — a
+- `ValueError` for a local file it cannot decode (`UnicodeDecodeError`) or parse
+  (`json.JSONDecodeError`), and `partest_gen.openapi_load.SpecReadError` — a
   `ValueError` subclass, so `except ValueError` keeps catching it — for a shape it cannot
   build from, an HTML or XML page, a downloaded body it cannot decode, and credentials it
   cannot send. Its `downloaded` attribute is true when the source is a URL, and `stage` says
   where it failed (`fetch`, `read`, `shape`);
-- `yaml.YAMLError` for YAML it cannot parse — **not** a `ValueError`;
+- for a downloaded body that parses as neither JSON nor YAML, `yaml.YAMLError` — **not** a
+  `ValueError`. A value YAML parses but cannot build — an unquoted date that does not exist,
+  such as `2023-02-29`, or a value its explicit tag cannot hold, such as `!!int abc` or
+  `!!timestamp abc` — is a `yaml.constructor.ConstructorError` at the value's position, not
+  the bare `ValueError` or `AttributeError` of the safe constructor. Its message shows the
+  value cut to 40 characters and the reason only up to its first colon;
 - the exceptions of `requests` and `urllib3` for a URL it cannot fetch — their text repeats
   the URL as given.
 
-The same parse errors come from a URL that was downloaded but does not parse. `SuiteIR.source` holds the cleaned source described above, also when the
-suite comes from `build_ir_from_openapi_dict(data, source=...)`.
+The parse error depends on the order the parsers are tried in. A local file is read as YAML
+first and, when that fails, as JSON, so a file that is neither raises the JSON error
+(`json.JSONDecodeError`), with the `yaml.YAMLError` that describes the file in its
+`__context__` chain; a `.json` file is read as JSON only. A downloaded body is tried the other
+way round — JSON, then YAML — so it raises `yaml.YAMLError`. The command line reports both as
+"is not valid YAML", and a `.json` file as "is not valid JSON", with the line and column. `SuiteIR.source` holds the cleaned source
+described above, also when the suite comes from `build_ir_from_openapi_dict(data, source=...)`.
 
 ## 6. Artifacts to read after a run
 

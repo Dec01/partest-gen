@@ -6,7 +6,7 @@
       "path": "docs/wiki/components/generator.md",
       "title": "partest-gen — parts of the generator",
       "status": "current",
-      "verified": "2026-10-19",
+      "verified": "2026-10-25",
       "audience": "agent",
       "ships_in_wheel": true,
       "sources": [
@@ -99,14 +99,14 @@
           "text": "7. Limits worth knowing"
         }
       ],
-      "chars": 14509
+      "chars": 17019
     },
     {
       "slug": "components/ui-layer",
       "path": "docs/wiki/components/ui-layer.md",
       "title": "The generated UI layer",
       "status": "current",
-      "verified": "2026-10-18",
+      "verified": "2026-10-25",
       "audience": "user",
       "ships_in_wheel": true,
       "sources": [
@@ -142,7 +142,7 @@
       "path": "docs/wiki/concepts/generated-contract.md",
       "title": "The contract of generated code",
       "status": "current",
-      "verified": "2026-10-18",
+      "verified": "2026-10-25",
       "audience": "user",
       "ships_in_wheel": true,
       "sources": [
@@ -189,7 +189,7 @@
       "path": "docs/wiki/decisions/banner-overwrite.md",
       "title": "ADR — перезаписываются только файлы с баннером",
       "status": "current",
-      "verified": "2026-10-18",
+      "verified": "2026-10-25",
       "audience": "maintainer",
       "ships_in_wheel": false,
       "sources": [
@@ -273,7 +273,7 @@
       "path": "docs/wiki/decisions/methodology-upstream.md",
       "title": "ADR — методология остаётся в partest",
       "status": "current",
-      "verified": "2026-10-18",
+      "verified": "2026-10-25",
       "audience": "maintainer",
       "ships_in_wheel": false,
       "sources": [
@@ -312,7 +312,7 @@
       "path": "docs/wiki/decisions/no-domain.md",
       "title": "ADR — в генерируемом коде нет продуктового домена",
       "status": "current",
-      "verified": "2026-10-18",
+      "verified": "2026-10-25",
       "audience": "maintainer",
       "ships_in_wheel": false,
       "sources": [
@@ -390,7 +390,7 @@
       "path": "docs/wiki/howto/after-generation.md",
       "title": "Turning stubs into tests",
       "status": "current",
-      "verified": "2026-10-18",
+      "verified": "2026-10-25",
       "audience": "user",
       "ships_in_wheel": true,
       "sources": [
@@ -436,14 +436,14 @@
           "text": "7. Done, for a slice"
         }
       ],
-      "chars": 4014
+      "chars": 4679
     },
     {
       "slug": "howto/contribute",
       "path": "docs/wiki/howto/contribute.md",
       "title": "Разработка генератора",
       "status": "current",
-      "verified": "2026-10-18",
+      "verified": "2026-10-25",
       "audience": "maintainer",
       "ships_in_wheel": false,
       "sources": [
@@ -493,7 +493,7 @@
       "path": "docs/wiki/howto/release.md",
       "title": "Release checklist",
       "status": "current",
-      "verified": "2026-10-18",
+      "verified": "2026-10-25",
       "audience": "maintainer",
       "ships_in_wheel": false,
       "sources": [
@@ -547,7 +547,7 @@
       "path": "docs/wiki/howto/resync.md",
       "title": "Re-syncing after the specification changed",
       "status": "current",
-      "verified": "2026-10-18",
+      "verified": "2026-10-25",
       "audience": "user",
       "ships_in_wheel": true,
       "sources": [
@@ -585,14 +585,14 @@
           "text": "When `--force` is the answer"
         }
       ],
-      "chars": 5933
+      "chars": 6058
     },
     {
       "slug": "howto/scaffold",
       "path": "docs/wiki/howto/scaffold.md",
       "title": "From an OpenAPI file to a collectable suite",
       "status": "current",
-      "verified": "2026-10-18",
+      "verified": "2026-10-25",
       "audience": "user",
       "ships_in_wheel": true,
       "sources": [
@@ -634,7 +634,7 @@
           "text": "7. Then what"
         }
       ],
-      "chars": 3561
+      "chars": 4473
     },
     {
       "slug": "index",
@@ -730,16 +730,28 @@
         {
           "level": 2,
           "text": "2026-10-19 · ревью патч-кандидата, четвёртый заход"
+        },
+        {
+          "level": 2,
+          "text": "2026-10-25 · следующий выпуск: каскад нового `partest` и долг прошлого выпуска"
+        },
+        {
+          "level": 2,
+          "text": "2026-10-25 · update · обнуление отчёта, `--url`, ошибки разбора"
+        },
+        {
+          "level": 2,
+          "text": "2026-10-25 · последний круг кандидата"
         }
       ],
-      "chars": 7483
+      "chars": 9260
     },
     {
       "slug": "proposals",
       "path": "docs/wiki/proposals.md",
       "title": "Предложения, ждущие решения",
       "status": "current",
-      "verified": "2026-10-19",
+      "verified": "2026-10-25",
       "audience": "maintainer",
       "ships_in_wheel": false,
       "sources": [],
@@ -831,16 +843,52 @@
         {
           "level": 3,
           "text": "(8) 2026-10-19 · единая публичная очистка URL в partest"
+        },
+        {
+          "level": 2,
+          "text": "2026-10-25 · ревью кандидата 1.2.2"
+        },
+        {
+          "level": 3,
+          "text": "(9) Сохранять скачанную спецификацию в `docs/openapi.yaml` — в 1.3.0"
+        },
+        {
+          "level": 3,
+          "text": "(10) Защита `sync-openapi` от «другого API» без `--prune`"
+        },
+        {
+          "level": 3,
+          "text": "(11) `assert report.average_pct >= 0` в `test_zorro.py` — тавтология"
+        },
+        {
+          "level": 3,
+          "text": "(12) Подсказка в `sync-openapi` о `reset_storage()` после `yield`"
+        },
+        {
+          "level": 3,
+          "text": "(13) Дописывать `coverage.json` в существующий `.gitignore` при sync"
+        },
+        {
+          "level": 3,
+          "text": "(14) `test_zorro.py` пропускается при `PARTEST_COVERAGE_JSON`"
+        },
+        {
+          "level": 3,
+          "text": "(15) `pytest-xdist` в экстре `dev`"
+        },
+        {
+          "level": 3,
+          "text": "(16) Два списка заглушек: `_is_placeholder_openapi` и `_RELEASED_PLACEHOLDERS`"
         }
       ],
-      "chars": 13328
+      "chars": 18581
     },
     {
       "slug": "status",
       "path": "docs/wiki/status.md",
       "title": "Статус, версии и что дальше",
       "status": "current",
-      "verified": "2026-10-19",
+      "verified": "2026-10-25",
       "audience": "maintainer",
       "ships_in_wheel": false,
       "sources": [
@@ -877,7 +925,7 @@
           "text": "4. Как обновлять эту страницу"
         }
       ],
-      "chars": 4635
+      "chars": 5768
     },
     {
       "slug": "WIKI",

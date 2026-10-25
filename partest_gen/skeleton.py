@@ -10,6 +10,7 @@ from typing import Dict, List, Optional, Union
 from partest_gen._fsguard import safe_target
 from partest_gen._text import md_code, md_text
 from partest_gen.ir import SuiteIR
+from partest_gen.openapi_load import _is_url
 from partest_gen.ui_layout import build_ui_files
 
 
@@ -20,6 +21,60 @@ class WriteResult:
     root: str = ""
     #: paths not written because a link (junction, symlink) lies on the way out of the project
     refused: List[str] = field(default_factory=list)
+
+
+#: ``docs/openapi.yaml`` of a new skeleton: one ``/health`` operation, until the project's own
+#: specification replaces it.
+_PLACEHOLDER_OPENAPI = """openapi: 3.0.3
+info:
+  title: Placeholder API
+  version: 0.0.0
+paths:
+  /health:
+    get:
+      tags: [health]
+      summary: Health check
+      operationId: getHealth
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+"""
+
+
+def _py_ascii(value: str) -> str:
+    """*value* as a double-quoted Python string literal in printable ASCII.
+
+    Everything outside it becomes ``\\uXXXX`` or ``\\UXXXXXXXX``, which Python reads back as
+    the same character — unlike ``json.dumps(ensure_ascii=True)``, whose surrogate pairs for a
+    character outside the BMP are two characters to Python. An invisible or look-alike
+    character in a committed file then shows up in review.
+    """
+    out = []
+    for ch in json.dumps(str(value), ensure_ascii=False):
+        code = ord(ch)
+        if 0x20 <= code < 0x7F:
+            out.append(ch)
+        elif code <= 0xFFFF:
+            out.append(f"\\u{code:04x}")
+        else:
+            out.append(f"\\U{code:08x}")
+    return "".join(out)
+
+
+def _is_placeholder_openapi(path: Path) -> bool:
+    """Whether *path* still holds :data:`_PLACEHOLDER_OPENAPI` (LF or CRLF, a BOM accepted)."""
+    try:
+        text = path.read_bytes().decode("utf-8-sig")
+    except (OSError, UnicodeDecodeError):
+        return False
+    return text.replace("\r\n", "\n") == _PLACEHOLDER_OPENAPI
 
 
 def _write(
@@ -104,17 +159,27 @@ def init_skeleton(
 
     Does **not** emit entity CRUD tests (G3/G4). Optionally writes IR dump
     when ``suite_ir`` is provided.
+
+    ``openapi_source`` is what ``confpartest.swagger_files`` points the coverage report at:
+    an ``http(s)://`` address is recorded as ``"url"``, anything else as a ``"local"`` path
+    (default ``docs/openapi.yaml``). It is written as given into ``confpartest.py``, a file
+    projects commit — pass an address without credentials and without tokens in its query.
     """
     root = Path(target).resolve()
     root.mkdir(parents=True, exist_ok=True)
     result = WriteResult(root=str(root))
     safe_name = (name or "api-suite").strip() or "api-suite"
 
-    openapi_conf = "docs/openapi.yaml"
+    openapi_kind, openapi_conf = "local", "docs/openapi.yaml"
     if openapi_source:
-        openapi_conf = openapi_source
+        # partest fetches a "url" entry and opens a "local" one as a path: an http(s) source
+        # recorded as "local" is looked for on disk and never found.
+        if _is_url(openapi_source):
+            openapi_kind, openapi_conf = "url", openapi_source.strip()
+        else:
+            openapi_conf = openapi_source
 
-    files = _skeleton_files(safe_name, openapi_conf, with_ui)
+    files = _skeleton_files(safe_name, openapi_conf, with_ui, openapi_kind=openapi_kind)
 
     for rel, content in files.items():
         _write(root, rel, content, force=force, result=result)
@@ -154,8 +219,14 @@ def init_skeleton(
     return result
 
 
-def _skeleton_files(safe_name: str, openapi_conf: str, with_ui: bool) -> Dict[str, str]:
-    """``rel_path -> content`` of the G1 skeleton (and the UI tree with ``with_ui``)."""
+def _skeleton_files(
+    safe_name: str, openapi_conf: str, with_ui: bool, *, openapi_kind: str = "local"
+) -> Dict[str, str]:
+    """``rel_path -> content`` of the G1 skeleton (and the UI tree with ``with_ui``).
+
+    ``openapi_kind`` is the ``swagger_files`` source type of ``openapi_conf``: ``"local"`` or
+    ``"url"``.
+    """
     files: Dict[str, str] = {}
 
     # --- root ---
@@ -184,10 +255,17 @@ cp env.example .env   # fill BASE_URL / tokens
 ## Run
 
 ```bash
-pytest src/api/tests -q
-# coverage report (after suite):
-pytest src/api/tests/test_zorro.py -q
+# the suite and its coverage report (coverage.json + coverage_report.html) in one run
+PARTEST_COVERAGE_JSON=coverage.json pytest src/api/tests -q
+# Windows PowerShell: $env:PARTEST_COVERAGE_JSON = "coverage.json"; pytest src/api/tests -q
 ```
+
+The counters live in the test process: a separate `pytest src/api/tests/test_zorro.py` run
+starts from zero and reports nothing covered. Inside the run, `test_zorro.py` sees only the
+calls made before it in its own process: not the tags collected after it (pytest collects
+files and directories together, alphabetically, so a tag directory named after
+`test_zorro.py` comes later), and under `pytest -n` not the other workers. The report written
+at the session end sees them all.
 
 Generated with partest. Do not commit secrets.
 """
@@ -277,10 +355,20 @@ KEYCLOAK_CLIENT_ID=
 # KEYCLOAK_ADMIN_PASSWORD=
 """
 
+    if openapi_kind == "url":
+        source_note = (
+            '# The specification above is a "url" source: it is fetched with the same switch, and\n'
+            "# its host is often a different one."
+        )
+    else:
+        source_note = (
+            '# The specification above is a "local" file and needs no TLS. A "url" source is '
+            "fetched with\n# the same switch, and its host is often a different one."
+        )
     files["confpartest.py"] = f'''"""partest OpenAPI coverage config (project-local)."""
 
 swagger_files = {{
-    {json.dumps(safe_name, ensure_ascii=False)}: ["local", {json.dumps(openapi_conf, ensure_ascii=False)}],
+    {_py_ascii(safe_name)}: [{_py_ascii(openapi_kind)}, {_py_ascii(openapi_conf)}],
 }}
 
 # TLS. partest verifies certificates by default, and the clients in
@@ -295,8 +383,7 @@ swagger_files = {{
 # The environment wins over this file: PARTEST_TLS_VERIFY=0 or a bundle path. The browser of
 # src/ui reads only the environment, never this file.
 #
-# The specification above is a "local" file and needs no TLS. A "url" source is fetched with
-# the same switch, and its host is often a different one. partest 2.6.0 and later fetch it on
+{source_note} partest 2.6.0 and later fetch it on
 # first use: if that fails, the first tracked API call raises ConfpartestError naming the
 # source, and the coverage report is built with nothing counted and gives the reason under
 # "partest: coverage NOT COUNTED". Earlier releases fetched it when partest was imported, so
@@ -307,6 +394,7 @@ test_types_coverage = [
     "request_default",
     "request_not_allowed",
 ]
+# Always read: endpoints called with these types are "exception", outside the averages (partest 2.7.0+)
 test_types_exception = [
     "health",
 ]
@@ -361,6 +449,7 @@ logs/
 allure-results/
 allure-report/
 coverage_report.html
+coverage.json
 api_call_counts.png
 .partest/
 dist/
@@ -376,27 +465,7 @@ build/
 """
 
     # placeholder openapi if none
-    files["docs/openapi.yaml"] = """openapi: 3.0.3
-info:
-  title: Placeholder API
-  version: 0.0.0
-paths:
-  /health:
-    get:
-      tags: [health]
-      summary: Health check
-      operationId: getHealth
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-"""
+    files["docs/openapi.yaml"] = _PLACEHOLDER_OPENAPI
 
     # --- src/api package tree ---
     for rel in [
@@ -524,8 +593,8 @@ from partest import ApiClient, CreatedRegistry, TrackingApiClient, reset_storage
 
 @pytest.fixture(scope="session", autouse=True)
 def _clear_coverage():
-    reset_storage()
-    yield
+    # Once, at the start: the counters belong to the whole run. The report written when the
+    # session ends (PARTEST_COVERAGE_JSON) reads them after this fixture is torn down.
     reset_storage()
 
 
@@ -574,7 +643,12 @@ def models():
 #     models.apply_token(token)
 '''
 
-    files["src/api/tests/test_zorro.py"] = '''"""Final coverage report (run last in CI after suite)."""
+    files["src/api/tests/test_zorro.py"] = '''"""Coverage report from inside the run.
+
+It sees only the calls made before it in this process: tags collected after it and other
+xdist workers are missing. The full report is the one written when the session ends:
+PARTEST_COVERAGE_JSON=coverage.json pytest src/api/tests
+"""
 
 import allure
 import pytest

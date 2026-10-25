@@ -1,7 +1,7 @@
 ---
 title: Re-syncing after the specification changed
 status: current
-verified: 2026-10-18
+verified: 2026-10-25
 sources: [partest_gen/cli.py, partest_gen/emitters/resources.py, partest_gen/emitters/util.py]
 audience: user
 ships_in_wheel: true
@@ -27,7 +27,7 @@ decides which of your files are overwritten, and the answer is not "none".
 | Kept, with a hint | checklists written by earlier releases, which asked to be marked by hand — delete one to get a current one |
 | Left alone | everything else, including tests you edited into real tests |
 | Refreshed | `.partest/suite_ir.json` and `.partest/openapi_summary.md` |
-| Copied | the specification into `docs/openapi.yaml`, so the project records what it was generated from |
+| Copied | only with `--file`: the specification into `docs/openapi.yaml`, so the project records what it was generated from. A `--url` download is not saved; the command says so while `docs/openapi.yaml` is still the placeholder |
 | Listed | generated files no operation produces any more — deleted only with `--prune` |
 
 `--depth` means the same as during generation. Passing a smaller depth than last time does not

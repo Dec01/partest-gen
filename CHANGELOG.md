@@ -6,6 +6,157 @@ code generator: the **names and locations of the files it writes** are part of t
 Renaming a generated module breaks hand-written imports in every project that ran the previous
 version, so it is a major change even though no exported name moved.
 
+## 1.2.2 — 2026-10-25
+
+### Fixed
+
+- **The coverage report written at the end of the session counted no calls.** The generated
+  `src/api/tests/conftest.py` reset the counters in its session fixture twice — at the start
+  and again in its teardown. `partest` writes the report named by `PARTEST_COVERAGE_JSON` (and
+  `PARTEST_COVERAGE_HTML`) when the session ends, after that teardown, so every endpoint showed
+  `calls: 0` and the run read as nothing covered — serially and under `pytest -n` alike. This
+  is the report a parallel run needs: the one `test_zorro.py` writes inside a test sees only
+  its own worker. The fixture now resets once, at the start. `test_zorro.py` was not affected:
+  it runs before the teardown.
+
+  **Existing projects.** None of the three files carries the banner, so `sync-openapi`
+  rewrites none of them. Three steps by hand:
+
+  1. `src/api/tests/conftest.py` — delete the second `reset_storage()`, the one after `yield`
+     (the `yield` can go too):
+
+     ```python
+     @pytest.fixture(scope="session", autouse=True)
+     def _clear_coverage():
+         reset_storage()
+         yield
+         reset_storage()      # remove this line
+     ```
+
+  2. `.gitignore` — add `coverage.json`. The report lists every endpoint of the stand, and
+     with TLS checking off it records the stand's host names.
+  3. `README.md` — in `## Run`, replace the two commands with
+     `PARTEST_COVERAGE_JSON=coverage.json pytest src/api/tests -q`.
+
+- **A specification downloaded with `--url` left the coverage report on the placeholder, and
+  nothing said so.** The download is not saved in the project, so `docs/openapi.yaml` stays
+  the skeleton's `/health` placeholder. `confpartest.py` points the coverage report at that
+  file, and `sync-openapi` without `--file` or `--url` reads it. `init --openapi <URL>`,
+  `from-openapi --url` and `sync-openapi --url` now print a line starting with `Not saved:`
+  while `docs/openapi.yaml` is still the placeholder, with what to do: save the specification
+  as `docs/openapi.yaml` before the first run. Saving the download is not done here: it is a
+  new write into existing projects (see `docs/wiki/proposals.md`, (9)).
+- **`dump-ir -o` to a path it cannot write ended in a traceback with exit code 1.** A
+  directory, a path under a file, or a write the system refuses now prints one line to
+  stderr — `error: cannot write IR to <path>: <reason>` — and exits with code 2, as an
+  unreadable specification does since 1.2.1. The IR is written to a temporary file beside
+  the target and moved over it, so a failed or interrupted write leaves the previous file
+  whole and no temporary file behind (a read-only target included). A specification that
+  holds a lone surrogate (an escape such as `"\ud800"`) is refused with one line before
+  anything is written, with `-o` or without, as by the other commands since 1.2.0. An IR
+  printed to a stdout whose encoding cannot hold one of its characters gives one line with
+  advice to use `-o`. Both used to end in a `UnicodeEncodeError` traceback with exit code 1.
+- **A date that does not exist in the specification was a traceback or the wrong message.**
+  YAML reads an unquoted `2023-02-29` (an `example`, a `default`) as a date, and the safe
+  constructor let the `ValueError` of the impossible date out bare: a local file was
+  reported as "not valid JSON", and a downloaded one ended in a traceback with exit code 1.
+  Every command that reads a specification now says
+  `is not valid YAML: cannot read the value '2023-02-29': day is out of range for month;
+  quote it to keep it a string (line …, column …)` and exits with code 2. `load_openapi()`
+  raises `yaml.constructor.ConstructorError` for it — a `yaml.YAMLError` at the value's
+  position, the type the generator page documents for YAML it cannot read. For a downloaded
+  body that is no longer a `ValueError`. A local file still raises `json.JSONDecodeError`,
+  with the YAML error in its `__context__` chain. The same holds for a value its explicit tag
+  cannot hold: `!!int abc` or `!!float abc` (a `ValueError`) and `!!timestamp abc` (an
+  `AttributeError`). The message shows the value cut to 40 characters, and the error's reason
+  only up to its first colon — `invalid literal for int() with base 10` — because the rest
+  repeats the whole value.
+- **`init_skeleton(openapi_source=<URL>)` recorded the URL as a `"local"` file** in the
+  generated `confpartest.py`. `partest` opens a `"local"` entry as a path, so the coverage
+  report found no specification. An `http://` or `https://` source (any case, surrounding
+  whitespace dropped) is now recorded as `["url", "<URL>"]`, and the TLS comment under it
+  says that this source is fetched with the same switch. A path stays `"local"`. The kind,
+  the address and the project name are written as ASCII Python literals, with `\uXXXX` and
+  `\UXXXXXXXX` escapes that read back as the same characters (also outside the BMP), so an
+  invisible or look-alike character shows up in review. An ASCII name and address are
+  written as before. The file is committed: pass an address without credentials and without
+  tokens in its query. The `partest-gen` commands never pass a source to the skeleton, so
+  trees they generate are unaffected; only Python code calling
+  `partest_gen.skeleton.init_skeleton` with a URL is.
+- **A `sync-openapi` without `--file` or `--url` against the placeholder said nothing.** When
+  `docs/openapi.yaml` is still the skeleton's `/health` placeholder and the project has
+  generated tags the placeholder does not declare, the sync now prints a `Warning:` line
+  naming them before it rewrites `paths.py` and the facades: pass the real specification. It
+  is a warning, not a refusal — the files it rewrites carry the banner.
+- **The `confpartest.py` comment put `test_types_exception` under "used only when
+  `zorro(use_matrix=False)`".** That holds for `test_types_coverage` only. The coverage report
+  always reads `test_types_exception`: an endpoint called with one of those types is reported
+  as `exception`, and from `partest` 2.7.0 on it is left out of every average. The list now
+  has its own comment line. Existing projects own `confpartest.py`; the old comment is wrong,
+  not harmful.
+
+### Documentation
+
+- The generated `README.md`, the after-generation guide and the `partest-scaffold` playbook
+  told you to run `pytest src/api/tests/test_zorro.py` after the suite, as a separate process.
+  The counters live in the test process, so that run starts from zero and reports nothing
+  covered. All three now give one command,
+  `PARTEST_COVERAGE_JSON=coverage.json pytest src/api/tests`, which writes `coverage.json`
+  and `coverage_report.html` when the session ends. The generated `.gitignore` lists
+  `coverage.json`. The README, the after-generation guide and the docstring of the generated
+  `test_zorro.py` (which said "run last in CI after suite") now say what that test sees: only
+  the calls made before it in its own process. Tags collected after it are missing — pytest
+  collects files and directories together, alphabetically, so a tag directory named after
+  `test_zorro.py` comes later — and so are the other workers under `pytest -n`. The guide,
+  the playbook and the skill name the symptom of the old conftest: zero calls on every
+  endpoint.
+- The scaffold guide and the playbook say what `--url` leaves behind, and warn against a
+  `sync-openapi --prune` without `--file`/`--url` while `docs/openapi.yaml` is the
+  placeholder. The prune is refused only when no generated tag is left in the specification.
+  If the real specification has a `health` tag, the prune goes ahead and deletes the
+  generated files of every other tag. The resync guide says the specification is copied
+  into `docs/openapi.yaml` only with `--file`.
+- The generator page said `load_openapi()` raises `yaml.YAMLError` for YAML it cannot parse.
+  For a local file it raises `json.JSONDecodeError`, a `ValueError`: the file is tried as YAML
+  and then as JSON, and the JSON error is the one raised, with the `yaml.YAMLError` in its
+  `__context__` chain. A `.json` file is read as JSON only. Only a downloaded body, tried as
+  JSON and then as YAML, raises `yaml.YAMLError`. The page now says so, and a test checks
+  each case. The code is unchanged: raising `yaml.YAMLError` for a local file would stop
+  `except ValueError` from catching it.
+
+### Compatibility
+
+- Checked against `partest` 2.7.0 as published on PyPI, and 2.6.0, each in a clean
+  environment with its pytest plugin loaded. The generated tree and the `dump-ir` output
+  are byte-for-byte the same on both: the methodology tables this package reads did not
+  change. The generated code does
+  not call `attach_response`, the request logger or `Logger.warning`, and does not read
+  `summary.avg`. The `test_zorro.py` stub checks `report.average_pct >= 0`, which still holds:
+  the value is still a `float`, `0.0` when nothing is scored.
+- Measured on a tree from this version against a stub API whose responses carry
+  secrets. `PARTEST_COVERAGE_JSON` was set, and runs were serial and with `-n 2`.
+  - 2.6.0 and 2.7.0 count the same calls (14) and the same average (52.38).
+  - With 2.7.0, `coverage.json` carries `meta.avgRule: 2` and a `depth` per endpoint:
+    11 cells, status asked in all 11, schema in 7. The stubs pass `expected_status_code`, and
+    `validate_model` where the specification has a response schema.
+  - The secrets appear nowhere in the terminal, `logs/pytest.log` or the Allure results.
+    With 2.6.0 they appear in all three.
+  - Without this version's conftest fix, `coverage.json` has zero calls on both.
+  - Repeated with the published 2.7.0: the repository's tests, golden included, pass, and
+    a generated project counts 14 calls in `coverage.json`, serially and with `-n 2`.
+  - The `-n 2` case of the repository's own test of this report runs only where
+    `pytest-xdist` is installed. It is not in the `dev` extra, so a plain
+    `pip install -e ".[dev]"` and CI skip that case; the parallel run above was measured
+    with `pytest-xdist` installed by hand.
+- A failing stub fails the same way with 2.7.0, but reads differently. A status mismatch is
+  raised as `partest.client.StatusMismatchError`, which subclasses `AssertionError`, and the
+  terminal names that type instead of `AssertionError`. Bodies and secret headers in the
+  message are masked, and a JSON body is re-serialised. The incorrect-body stubs expect a set
+  of statuses, `(400, 415)`, but pass no `validate_model`, so 2.7.0's re-raised schema error
+  under a set of statuses does not reach them. The generated clients set no `max_retries`,
+  so the new rule that an expected status is never retried changes nothing either.
+- The `partest>=2.1.0` floor stays: nothing generated needs 2.7.0.
+
 ## 1.2.1 — 2026-10-19
 
 ### Fixed

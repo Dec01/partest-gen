@@ -58,6 +58,44 @@ def test_dump_ir_writes_json_without_touching_a_project(tmp_path: Path):
     assert list(tmp_path.iterdir()) == [out], "dump-ir must write only the file it was asked for"
 
 
+@pytest.mark.parametrize("where", ["under a file", "a directory"])
+def test_dump_ir_to_a_path_it_cannot_write_is_one_line_and_exit_code_2(where, tmp_path, capsys):
+    """The output path is the user's input as much as the specification is."""
+    blocker = tmp_path / "blocker"
+    if where == "under a file":
+        blocker.write_text("x", encoding="utf-8")
+        out = blocker / "ir.json"
+    else:
+        blocker.mkdir()
+        out = blocker
+    capsys.readouterr()
+    code = cli_main(["dump-ir", str(FIXTURE), "-o", str(out)])
+    captured = capsys.readouterr()
+    assert code == 2
+    assert "Traceback" not in captured.err
+    lines = captured.err.strip().splitlines()
+    assert len(lines) == 1, captured.err
+    assert lines[0].startswith(f"error: cannot write IR to {out}: ")
+    assert "Wrote IR" not in captured.out
+
+
+def test_dump_ir_that_fails_to_write_keeps_the_previous_file(tmp_path, monkeypatch, capsys):
+    """Written through a temporary file and ``os.replace``: no truncated IR, no leftovers."""
+    import os
+
+    out = tmp_path / "ir.json"
+    out.write_text("previous", encoding="utf-8")
+
+    def refuse(src, dst):
+        raise PermissionError(13, "Permission denied")
+
+    monkeypatch.setattr(os, "replace", refuse)
+    assert cli_main(["dump-ir", str(FIXTURE), "-o", str(out)]) == 2
+    assert "Permission denied" in capsys.readouterr().err
+    assert out.read_text(encoding="utf-8") == "previous"
+    assert list(tmp_path.iterdir()) == [out], "the temporary file must not stay behind"
+
+
 def test_sync_without_a_project_fails_instead_of_creating_one(tmp_path: Path, capsys):
     """A typo in the path must not silently scaffold a project somewhere unexpected."""
     missing = tmp_path / "not-here"
@@ -360,6 +398,114 @@ def test_a_generator_bug_behind_a_readable_specification_still_raises(monkeypatc
         cli_main(["dump-ir", str(FIXTURE)])
 
 
+def test_load_openapi_raises_the_parse_errors_the_generator_page_documents(tmp_path, monkeypatch):
+    """docs/wiki/components/generator.md §5: a local file that parses as neither YAML nor JSON
+    is a ``json.JSONDecodeError`` (a ``ValueError``) with the YAML error as its context; a
+    downloaded body is ``yaml.YAMLError`` — not a ``ValueError``."""
+    import json
+
+    import yaml
+
+    from partest_gen.openapi_load import load_openapi
+
+    def contexts(exc):
+        while exc is not None:
+            yield exc
+            exc = exc.__context__
+
+    broken = "openapi: 3.0.0\npaths: [unclosed\n"
+    with pytest.raises(json.JSONDecodeError) as local:
+        load_openapi(_spec_file(tmp_path, "spec.yaml", broken))
+    # json's own StopIteration sits between the two
+    assert any(isinstance(e, yaml.YAMLError) for e in contexts(local.value))
+    with pytest.raises(json.JSONDecodeError) as local_json:
+        load_openapi(_spec_file(tmp_path, "spec.json", '{"openapi": '))
+    assert not any(isinstance(e, yaml.YAMLError) for e in contexts(local_json.value)), (
+        "a .json file is not tried as YAML"
+    )
+
+    _served(monkeypatch, broken.encode("utf-8"), "application/yaml")
+    with pytest.raises(yaml.YAMLError) as downloaded:
+        load_openapi("https://spec.example/o.yaml")
+    assert not isinstance(downloaded.value, ValueError)
+
+
+_IMPOSSIBLE_DATE = "\n".join([
+    "openapi: 3.0.0",
+    "info: {title: t, version: '1'}",
+    "paths:",
+    "  /x:",
+    "    get:",
+    "      responses:",
+    "        '200':",
+    "          description: ok",
+    "          content:",
+    "            application/json:",
+    "              example: 2023-02-29",
+    "",
+])
+
+
+@pytest.mark.parametrize(
+    "tag", ["!!python/object/apply:os.system ['echo PWNED']", "!!python/object:builtins.dict {}"]
+)
+def test_the_spec_loader_stays_safe(tag):
+    """``_SpecLoader`` is a SafeLoader: Python tags are still refused, nothing is built."""
+    import yaml
+
+    from partest_gen.openapi_load import _SpecLoader, _yaml_load
+
+    assert issubclass(_SpecLoader, yaml.SafeLoader)
+    with pytest.raises(yaml.constructor.ConstructorError, match="could not determine a constructor"):
+        _yaml_load(f"x: {tag}\n")
+
+
+@pytest.mark.parametrize("command", _COMMANDS)
+def test_a_date_that_does_not_exist_is_one_line_with_its_position(command, tmp_path, capsys):
+    """YAML reads an unquoted 2023-02-29 as a date, and the date cannot be built. The safe
+    constructor let that out as a bare ValueError: a local file was reported as invalid JSON."""
+    source = _spec_file(tmp_path, "spec.yaml", _IMPOSSIBLE_DATE)
+    line = _one_line_and_two(command, tmp_path, source, capsys)
+    assert line.endswith(
+        "is not valid YAML: cannot read the value '2023-02-29': day is out of range for month; "
+        "quote it to keep it a string (line 11, column 24)"
+    ), line
+
+
+def test_a_downloaded_date_that_does_not_exist_is_one_line(tmp_path, capsys, monkeypatch):
+    """From a URL the same value was a traceback with exit code 1."""
+    _served(monkeypatch, _IMPOSSIBLE_DATE.encode("utf-8"), "application/yaml")
+    line = _one_line_and_two("from-openapi", tmp_path, "https://spec.example/o.yaml", capsys,
+                             url=True)
+    assert line == (
+        "error: https://spec.example/o.yaml is not valid YAML: cannot read the value "
+        "'2023-02-29': day is out of range for month; quote it to keep it a string "
+        "(line 11, column 24)"
+    )
+
+
+def test_a_downloaded_specification_left_as_the_placeholder_is_named(tmp_path, capsys,
+                                                                      monkeypatch):
+    """--url does not save the document; the placeholder is what coverage and a bare sync read."""
+    spec = FIXTURE.read_bytes()
+    _served(monkeypatch, spec, "application/yaml")
+    dest = tmp_path / "proj"
+    capsys.readouterr()
+    assert cli_main(["from-openapi", str(dest), "--url", "https://spec.example/o.yaml"]) == 0
+    out = capsys.readouterr().out
+    assert "Not saved: the specification was downloaded, and docs/openapi.yaml is still the" in out
+    assert cli_main(["sync-openapi", str(dest), "--url", "https://spec.example/o.yaml"]) == 0
+    assert "Not saved:" in capsys.readouterr().out
+
+    (dest / "docs" / "openapi.yaml").write_bytes(spec)  # saved by hand: the hint stops
+    assert cli_main(["sync-openapi", str(dest), "--url", "https://spec.example/o.yaml"]) == 0
+    assert "Not saved:" not in capsys.readouterr().out
+
+    local = tmp_path / "local"
+    assert cli_main(["from-openapi", str(local), "--file", str(FIXTURE)]) == 0
+    assert "Not saved:" not in capsys.readouterr().out
+
+
 def test_init_package_exports_help_does_not_point_into_the_generated_tree(capsys):
     """Run over src/api/resources it takes the generator's __init__.py files for good."""
     with pytest.raises(SystemExit):
@@ -653,3 +799,83 @@ def test_a_broken_body_under_an_announced_utf16_names_the_charset(tmp_path, caps
     line = _one_line_and_two("dump-ir", tmp_path, "https://spec.example/o.yaml", capsys)
     assert "does not say so" not in line
     assert "the response is not valid UTF_16 text (byte 0x" in line
+
+
+@pytest.mark.parametrize(
+    "value, expected",
+    [
+        ("!!int SECRET-0123456789-abcdefghijklmnopqrstuvwxyz-TAIL",
+         "cannot read the value 'SECRET-0123456789-abcdefghijklmnopqrstuv…': "
+         "invalid literal for int() with base 10 (line 11, column 24)"),
+        ("!!timestamp zzz",
+         "cannot read the value 'zzz': not a value its tag can hold (line 11, column 24)"),
+    ],
+)
+def test_a_value_its_tag_cannot_hold_is_one_line(value, expected, tmp_path, capsys):
+    """The error's own text repeats the value whole; only the clipped value is shown."""
+    source = _spec_file(tmp_path, "spec.yaml", _IMPOSSIBLE_DATE.replace("2023-02-29", value))
+    line = _one_line_and_two("dump-ir", tmp_path, source, capsys)
+    assert line.endswith(f"is not valid YAML: {expected}"), line
+    assert "TAIL" not in line
+
+
+@pytest.mark.parametrize("to_file", [False, True])
+def test_dump_ir_of_a_lone_surrogate_is_one_line(to_file, tmp_path, capsys):
+    """A "\\ud800" escape cannot be encoded into a file or onto stdout."""
+    spec = FIXTURE.read_text(encoding="utf-8").replace(
+        "title: Sample Shop API", 'title: "Sample \\ud800 Shop"'
+    )
+    source = _spec_file(tmp_path, "surrogate.yaml", spec)
+    out = tmp_path / "ir.json"
+    argv = ["dump-ir", source] + (["-o", str(out)] if to_file else [])
+    capsys.readouterr()
+    assert cli_main(argv) == 2
+    captured = capsys.readouterr()
+    lines = captured.err.strip().splitlines()
+    assert len(lines) == 1 and "lone surrogate" in lines[0], captured.err
+    assert captured.out == ""
+    assert not out.exists()
+
+
+def test_dump_ir_onto_a_read_only_file_leaves_no_temporary_file(tmp_path, capsys):
+    """The mode copied from a read-only target made the temporary file read-only, and on
+    Windows it could not be deleted after the replace failed."""
+    import os
+    import stat
+
+    out = tmp_path / "ir.json"
+    out.write_text("previous", encoding="utf-8")
+    os.chmod(out, stat.S_IREAD)
+    try:
+        code = cli_main(["dump-ir", str(FIXTURE), "-o", str(out)])
+        leftovers = [p.name for p in tmp_path.iterdir() if p != out]
+        if os.name == "nt":
+            assert code == 2, "Windows does not replace a read-only file"
+            assert out.read_text(encoding="utf-8") == "previous"
+        assert leftovers == [], leftovers
+    finally:
+        os.chmod(out, stat.S_IREAD | stat.S_IWRITE)
+
+
+def test_a_bare_sync_against_the_placeholder_warns(tmp_path, capsys):
+    """Without --file/--url sync reads docs/openapi.yaml; still the placeholder, it would
+    rewrite paths.py without the tags the project was generated with."""
+    dest = tmp_path / "proj"
+    assert cli_main(["from-openapi", str(dest), "--file", str(FIXTURE)]) == 0
+    from partest_gen.skeleton import _PLACEHOLDER_OPENAPI
+
+    (dest / "docs" / "openapi.yaml").write_text(_PLACEHOLDER_OPENAPI, encoding="utf-8")
+    capsys.readouterr()
+    assert cli_main(["sync-openapi", str(dest)]) == 0
+    out = capsys.readouterr().out
+    assert "Warning: docs/openapi.yaml is still the skeleton's /health placeholder" in out
+    assert "(items)" in out
+
+    # an explicit source, or a placeholder in a project with no other tags: no warning
+    assert cli_main(["sync-openapi", str(dest), "--file", str(dest / "docs/openapi.yaml")]) == 0
+    assert "Warning: docs/openapi.yaml" not in capsys.readouterr().out
+    fresh = tmp_path / "fresh"
+    assert cli_main(["init", str(fresh)]) == 0
+    capsys.readouterr()
+    assert cli_main(["sync-openapi", str(fresh)]) == 0
+    assert "Warning: docs/openapi.yaml" not in capsys.readouterr().out

@@ -81,6 +81,43 @@ def _charset(content_type: str) -> str:
     return match.group(1)
 
 
+class _SpecLoader(yaml.SafeLoader):
+    """``yaml.SafeLoader`` whose values that cannot be built are ``yaml.YAMLError`` too.
+
+    The safe constructor turns ``2023-02-29`` or ``2023-13-01`` into a ``datetime.date`` and
+    lets the ``ValueError`` of an impossible date escape bare — no line, and a type a caller
+    cannot tell from a bug. Here it is a ``ConstructorError`` at the value's position.
+    """
+
+    def construct_object(self, node, deep=False):
+        try:
+            return super().construct_object(node, deep=deep)
+        except (ValueError, AttributeError) as exc:
+            # The text of the error repeats the value (``invalid literal for int() with base
+            # 10: '…'``): only the part before the colon is kept, and the value is clipped.
+            # AttributeError is what ``!!timestamp zzz`` gives: the pattern did not match.
+            if isinstance(exc, ValueError):
+                reason = str(exc).split(":", 1)[0].strip()
+            else:
+                reason = "not a value its tag can hold"
+            scalar = isinstance(node, yaml.ScalarNode)
+            what = f"cannot read the value {_clip(str(node.value))!r}" if scalar else (
+                "cannot read a value"
+            )
+            advice = ""
+            if isinstance(exc, ValueError) and str(node.tag).endswith(":timestamp"):
+                advice = "; quote it to keep it a string"
+            raise yaml.constructor.ConstructorError(
+                None, None, f"{what}: {reason}{advice}", node.start_mark
+            ) from None
+
+
+def _yaml_load(text: str) -> Any:
+    # _SpecLoader inherits SafeLoader; it only turns a ValueError or AttributeError raised
+    # while building a value into a ConstructorError.
+    return yaml.load(text, Loader=_SpecLoader)  # nosec B506
+
+
 def _is_url(src: str) -> bool:
     """Whether *src* is fetched rather than opened: an ``http``/``https`` scheme, any case."""
     return src.strip().lower().startswith(("http://", "https://"))
@@ -142,7 +179,7 @@ def load_openapi_dict(source: Union[str, Path], *, source_type: str = "auto") ->
         try:
             data = json.loads(text)
         except json.JSONDecodeError:
-            data = yaml.safe_load(text)
+            data = _yaml_load(text)
     elif kind == "local":
         path = Path(src)
         if not path.is_file():
@@ -154,7 +191,7 @@ def load_openapi_dict(source: Union[str, Path], *, source_type: str = "auto") ->
             data = json.loads(text)
         else:
             try:
-                data = yaml.safe_load(text)
+                data = _yaml_load(text)
             except Exception:
                 data = json.loads(text)
     else:

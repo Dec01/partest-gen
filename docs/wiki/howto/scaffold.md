@@ -1,7 +1,7 @@
 ---
 title: From an OpenAPI file to a collectable suite
 status: current
-verified: 2026-10-18
+verified: 2026-10-25
 sources: [partest_gen/cli.py, partest_gen/skeleton.py, partest_gen/emitters/resources.py]
 audience: user
 ships_in_wheel: true
@@ -54,6 +54,18 @@ works in place of `--file`:
 ```bash
 partest-gen from-openapi ./my-suite --url https://api.example.com/openapi.json --depth p1
 ```
+
+A downloaded specification is not saved in the project. `docs/openapi.yaml` stays the
+placeholder with one `/health` operation, and `confpartest.py` points the coverage report at
+it, so the report counts only `/health`. The command says so in a line starting with
+`Not saved:`. Save the specification as `docs/openapi.yaml` before the first run. A bare
+`sync-openapi` without `--file` or `--url` reads `docs/openapi.yaml` too: against the
+placeholder it rewrites `paths.py` without the real specification's paths and lists the other
+generated files as orphaned; it prints a `Warning:` line naming the tags it is about to drop.
+**Never add `--prune` to such a sync.** The prune is refused only
+when no generated tag is left in the specification, and the placeholder's tag is `health`. If
+the real specification has a `health` tag as well, the prune goes ahead and deletes the
+generated files of every other tag.
 
 `--depth` controls how much is emitted: `resources` for paths and collection facades only,
 `default` to add payloads, validations and the first tests, `p1` for the full stub matrix.

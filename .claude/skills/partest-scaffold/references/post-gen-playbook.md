@@ -97,10 +97,13 @@ Do **not** use raw httpx for suite coverage calls.
 ## 4. Measure & close gaps
 
 ```bash
-pytest src/api/tests -q --domain "$BASE_URL"
-# last (or dedicated job): coverage report
-pytest src/api/tests/test_zorro.py -q
+# the suite and its coverage report in one process: the counters live in memory, so a
+# separate `pytest src/api/tests/test_zorro.py` run reports zeros
+PARTEST_COVERAGE_JSON=coverage.json pytest src/api/tests -q --domain "$BASE_URL"
 ```
+
+A `coverage.json` with zero calls on every endpoint, on a tree whose `src/api/tests/conftest.py` still calls `reset_storage()` a second time after `yield`, comes from that line: delete it. `test_zorro.py` sees only the calls made before it in its process — not
+the tags collected after it, not other xdist workers; the session-end report sees them all.
 
 From `zorro` / `coverage_report.html`:
 

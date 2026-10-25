@@ -1,7 +1,7 @@
 ---
 title: ADR — перезаписываются только файлы с баннером
 status: current
-verified: 2026-10-18
+verified: 2026-10-25
 sources: [partest_gen/emitters/util.py, partest_gen/skeleton.py, partest_gen/emitters/resources.py, partest_gen/cli.py]
 audience: maintainer
 ships_in_wheel: false

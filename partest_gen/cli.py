@@ -254,6 +254,24 @@ def _copy_spec(root: Path, openapi: str, *, when, refused: List[str]) -> bool:
     return True
 
 
+def _print_placeholder_hint(root: Path, openapi: str) -> None:
+    """Say so when a downloaded specification left ``docs/openapi.yaml`` the placeholder.
+
+    A download is not saved in the project, and the placeholder is what ``confpartest.py``
+    points the coverage report at and what a ``sync-openapi`` without a source reads.
+    """
+    from partest_gen.openapi_load import _is_url
+    from partest_gen.skeleton import _is_placeholder_openapi
+
+    if _is_url(str(openapi)) and _is_placeholder_openapi(root / "docs" / "openapi.yaml"):
+        print(
+            "Not saved: the specification was downloaded, and docs/openapi.yaml is still the "
+            "/health placeholder that confpartest.py points the coverage report at and that "
+            "sync-openapi without --file or --url reads. Save the specification as "
+            "docs/openapi.yaml before the first run."
+        )
+
+
 _PATH_CLASS = re.compile(r"^class (Paths\w+)\(PathsBase\):$")
 _PATH_CONST = re.compile(r'^        self\.(\w+) = (".*")$')
 
@@ -375,25 +393,80 @@ def _cmd_init(args: argparse.Namespace) -> int:
 
     _print_result(result, verbose=bool(args.verbose))
     _print_refused(result.refused)
+    if openapi:
+        _print_placeholder_hint(Path(result.root), openapi)
     print("Next: pip install -r requirements/api.txt && cp env.example .env")
     if suite_ir is not None:
         print("See .partest/openapi_summary.md for paths registry + P1 matrix")
     return 0
 
 
+def _write_atomically(out: Path, text: str) -> None:
+    """Write *text* to *out* through a temporary file beside it and ``os.replace``: a failed
+    or interrupted write leaves the previous file whole and no partial one behind."""
+    import os
+    import tempfile
+
+    fd, tmp = tempfile.mkstemp(prefix=f".{out.name}.", suffix=".tmp", dir=str(out.parent))
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(text)
+        # mkstemp creates the file 0600; give it the mode a plain write would have
+        try:
+            mode = out.stat().st_mode & 0o777
+        except OSError:
+            umask = os.umask(0)
+            os.umask(umask)
+            mode = 0o666 & ~umask
+        os.chmod(tmp, mode)
+        os.replace(tmp, out)
+    except BaseException:
+        try:
+            # the mode copied from a read-only target makes the temporary file read-only too,
+            # and Windows refuses to delete a read-only file
+            os.chmod(tmp, 0o600)
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
 def _cmd_dump_ir(args: argparse.Namespace) -> int:
     ir = _load_spec(args.openapi, file_hint="its path instead of the URL")
     if ir is None:
+        return 2
+    from partest_gen.emitters.util import _unwritable
+
+    # A lone surrogate (an escape such as "\ud800" in the specification) cannot be encoded
+    # into a file or onto stdout: said before anything is written, as by the other commands.
+    problems = _unwritable(ir, windows=False)
+    if problems:
+        print(f"error: the IR cannot be written as UTF-8: {problems[0]}", file=sys.stderr)
         return 2
     out = Path(args.out) if args.out else None
     payload = ir.to_dict()
     text = json.dumps(payload, ensure_ascii=False, indent=2)
     if out:
-        out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_text(text, encoding="utf-8")
+        try:
+            out.parent.mkdir(parents=True, exist_ok=True)
+            _write_atomically(out, text)
+        except OSError as exc:
+            # the output path is the user's, like the input: a line, not a traceback
+            why = exc.strerror or type(exc).__name__
+            print(f"error: cannot write IR to {visible(str(out))}: {why}", file=sys.stderr)
+            return 2
         print(f"Wrote IR: {out} ({len(ir.operations)} operations)")
     else:
-        print(text)
+        try:
+            print(text)
+        except UnicodeEncodeError as exc:
+            # stdout redirected under a legacy code page cannot hold every character
+            print(
+                f"error: cannot print the IR in {exc.encoding}: it holds "
+                f"{visible(exc.object[exc.start:exc.end])!r} — write it with -o <path>",
+                file=sys.stderr,
+            )
+            return 2
     return 0
 
 
@@ -456,6 +529,7 @@ def _cmd_sync_openapi(args: argparse.Namespace) -> int:
 
     openapi = _resolve_openapi(args)
     root = Path(args.path).resolve()
+    from_docs = not openapi
     if not openapi:
         # try project docs
         candidate = root / "docs" / "openapi.yaml"
@@ -496,15 +570,29 @@ def _cmd_sync_openapi(args: argparse.Namespace) -> int:
     if _refuse_unwritable(suite):
         return 2
 
+    from partest_gen.emitters.util import is_snake
+
+    # The tags that already have a collection in the project.
+    have = {
+        p.stem[len("collection_"):]
+        for p in (root / "src/api/resources/collections").glob("collection_*.py")
+    }
+    if from_docs:
+        from partest_gen.skeleton import _is_placeholder_openapi
+
+        lost = sorted(have - {is_snake(t) for t in suite.tags()})
+        if lost and _is_placeholder_openapi(root / "docs" / "openapi.yaml"):
+            # A warning, not a refusal: the files it rewrites carry the banner and are in git.
+            print(
+                "Warning: docs/openapi.yaml is still the skeleton's /health placeholder, and "
+                f"this project has generated tags it does not declare ({', '.join(lost)}). "
+                "This sync rewrites paths.py and the facades from the placeholder; pass the "
+                "real specification with --file or --url."
+            )
+
     if getattr(args, "prune", False):
         # Against the wrong specification most of the tree looks orphaned. The cheapest sign of
         # it: not one tag that already has a collection in the project is still in the spec.
-        from partest_gen.emitters.util import is_snake
-
-        have = {
-            p.stem[len("collection_"):]
-            for p in (root / "src/api/resources/collections").glob("collection_*.py")
-        }
         if have and not have & {is_snake(t) for t in suite.tags()}:
             print(
                 "error: --prune refused: none of the tags already generated here "
@@ -547,6 +635,7 @@ def _cmd_sync_openapi(args: argparse.Namespace) -> int:
     _print_result(result, verbose=bool(args.verbose))
     _print_skip_hints(root, result)
     _print_refused(copy_refused + result.refused)
+    _print_placeholder_hint(root, openapi)
     if entities:
         from partest_gen.emitters.util import class_name, is_snake
 

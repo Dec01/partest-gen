@@ -75,12 +75,23 @@ away from removing production rows does not belong in a test suite.
 ## 5. Measure, then choose the next slice
 
 ```bash
-pytest src/api/tests -q
-pytest src/api/tests/test_zorro.py -q      # coverage report, run it last
+PARTEST_COVERAGE_JSON=coverage.json pytest src/api/tests -q
 ```
 
-The report's missing-case list per endpoint is the next backlog. Run the coverage report
-serially — under parallel workers a report written inside a test sees only its own worker.
+One command: the suite, then `coverage.json` and `coverage_report.html`, written when the
+session ends. The counters live in the test process, so a separate
+`pytest src/api/tests/test_zorro.py` run starts from zero and reports nothing covered. The
+report written at the session end sees every worker under `pytest -n` too. The one
+`test_zorro.py` writes inside the run sees only the calls made before it in its own process:
+not the tags collected after it (pytest collects files and directories together,
+alphabetically, so a tag directory named after `test_zorro.py` comes later), and under
+`pytest -n` not the other workers.
+
+A `coverage.json` with zero calls on every endpoint, on a tree whose
+`src/api/tests/conftest.py` still calls `reset_storage()` a second time after `yield`, comes
+from that line: delete it.
+
+The report's missing-case list per endpoint is the next backlog.
 
 Prefer an empty missing list on critical writes over a uniform spread of shallow cases
 everywhere. Coverage is a map of what you have checked, not a score to raise.

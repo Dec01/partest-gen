@@ -159,6 +159,66 @@ def test_golden_api_collect_only(golden_suite: Path):
     assert "collected" in out.lower() or "test session" in out.lower() or "tests" in out.lower()
 
 
+@pytest.fixture
+def stub_api():
+    """Any request answers 200 with ``{}``: the run only has to reach the counters."""
+    import threading
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    class Handler(BaseHTTPRequestHandler):
+        def _answer(self):
+            length = int(self.headers.get("Content-Length") or 0)
+            if length:
+                self.rfile.read(length)
+            body = b"{}"
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        do_GET = do_POST = do_PUT = do_PATCH = do_DELETE = _answer
+
+        def log_message(self, *args):
+            pass
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield f"http://127.0.0.1:{server.server_address[1]}"
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+@pytest.mark.parametrize("mode", ["serial", "xdist"])
+def test_the_report_written_at_session_end_counts_the_calls(mode, golden_suite: Path, stub_api):
+    """``PARTEST_COVERAGE_JSON`` is written when the session ends, after the session fixtures
+    are torn down. A conftest that reset the counters in its teardown left that report with
+    zero calls on every endpoint — serially and under xdist alike."""
+    args = [sys.executable, "-m", "pytest", "src/api/tests", "-q", "-p", "no:cacheprovider",
+            "--domain", stub_api]
+    if mode == "xdist":
+        try:
+            import xdist  # noqa: F401
+        except ImportError:
+            pytest.skip("pytest-xdist is not installed in this environment")
+        args += ["-n", "2"]
+    report = golden_suite / "coverage.json"
+    env = _env_for_suite(golden_suite)
+    env["PARTEST_COVERAGE_JSON"] = str(report)
+    env["PARTEST_COVERAGE_HTML"] = str(golden_suite / "coverage_report.html")
+    r = subprocess.run(args, cwd=golden_suite, env=env, capture_output=True, text=True,
+                       timeout=300)
+    assert report.is_file(), f"no coverage.json — is the partest plugin loaded?\n{r.stdout[-2000:]}"
+    import json
+
+    rows = json.loads(report.read_text(encoding="utf-8"))["endpoints"]
+    calls = {(row["method"], row["path"]): row["calls"] for row in rows}
+    assert calls.get(("GET", "/items"), 0) > 0, f"no calls counted: {calls}\n{r.stdout[-2000:]}"
+
+
 def test_golden_ui_collect_only(golden_suite: Path):
     """Collect UI smoke tests if playwright is available; else skip soft."""
     try:
